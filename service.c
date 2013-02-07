@@ -39,7 +39,7 @@ struct cmd cmds[4] = {
  * Receives bytes from the given socket one at a time until either a valid
  * command is recognized, or an invalid sequence of bytes is detected */
 //-----------------------------------------------------------------------------
-static enum req_id get_request (int sock) {
+static enum req_id get_request (long sock) {
     char c;
     size_t i;
     ssize_t rc;
@@ -96,10 +96,10 @@ void *handle_request (void *data) {
 
     ssize_t off, rc;
     uint32_t resp, enc;
-    int sock;
+    long sock;
     bool done;
 
-    sock = (int) data;
+    sock = (long) data;
     done = false;
 
     while (!done) {

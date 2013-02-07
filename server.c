@@ -34,7 +34,8 @@ static void usage (void) {
 int main (int argc, char *argv[]) {
 
     char *endptr;
-    int sockfd, new_fd;
+    int sockfd;
+    long new_fd;
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_storage their_addr;
     socklen_t sin_size;
