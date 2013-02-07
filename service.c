@@ -18,9 +18,8 @@
 
 /* use separate enums for request id and command recognition state; this
  * makes it easier to extend the FSM */
-enum req_id { UPTIME, LOAD, EXIT, INVALID, CLOSED };
-enum state  { STATE_UPTIME = 0, STATE_LOAD = 1, STATE_EXIT = 2,
-              STATE_INIT = 3 };
+enum req_id { LOGIN, LOGOUT, LIST, INVALID, CLOSED };
+enum state  { STATE_LOGIN, STATE_LOGOUT, STATE_LIST, STATE_INIT };
 
 struct cmd {
     const char *str; // string
@@ -28,12 +27,12 @@ struct cmd {
 };
 
 /* a 'smart' data structure to simplify the code later.
- * commands are indexed by the corresponding req_id */
+ * commands are indexed by the corresponding state enum */
 struct cmd cmds[4] = {
-    { "uptime", 6 },
-    { "load",   4 },
-    { "exit",   4 },
-    { "",       1 }  // 1 to accomodate for initial state
+    [STATE_LOGIN]  = { "in",   2 },
+    [STATE_LOGOUT] = { "out",  3 },
+    [STATE_LIST]   = { "list", 4 },
+    [STATE_INIT]   = { "",     1 } // 1 to accomodate initial state
 };
 
 /*-----------------------------------------------------------------------------
@@ -54,39 +53,40 @@ static enum req_id get_request (int sock) {
             return CLOSED;
         }
 
+        // ETX
         if (c == 3)
             return CLOSED;
 
         // initial state
         if (state == STATE_INIT) {
-            if (c == cmds[STATE_UPTIME].str[0])
-                state = UPTIME;
-            else if (c == cmds[STATE_LOAD].str[0])
-                state = LOAD;
-            else if (c == cmds[STATE_EXIT].str[0])
-                state = EXIT;
+            if (c == cmds[STATE_LOGIN].str[0])
+                state = STATE_LOGIN;
+            else if (c == cmds[STATE_LOGOUT].str[0])
+                state = STATE_LOGOUT;
+            else if (c == cmds[STATE_LIST].str[0])
+                state = STATE_LIST;
             else
                 return INVALID;
         }
 
         // all command recognition states are essentially the same:
-        // either transistion to the 'next' state (i++) or the invalid state
+        // either transition to the 'next' state (i++) or the invalid state
         if (c != cmds[state].str[i])
             return INVALID;
     }
 
     // map state to request
     switch (state) {
-    case STATE_UPTIME:
-        return UPTIME;
-    case STATE_LOAD:
-        return LOAD;
-    case STATE_EXIT:
-        return EXIT;
-    case STATE_INIT:
+    case STATE_LOGIN:
+        return LOGIN;
+    case STATE_LOGOUT:
+        return LOGOUT;
+    case STATE_LIST:
+        return LIST;
+    default:
         return INVALID;
     }
-    return INVALID;;
+    return INVALID;
 }
 
 /*-----------------------------------------------------------------------------
@@ -96,8 +96,7 @@ void *handle_request (void *data) {
 
     ssize_t off, rc;
     uint32_t resp, enc;
-    int sock, bad_cmds = 0;
-    time_t t;
+    int sock;
     bool done;
 
     sock = (int) data;
@@ -105,39 +104,25 @@ void *handle_request (void *data) {
 
     while (!done) {
         switch (get_request (sock)) {
-            case UPTIME:
-                bad_cmds = 0;
-                if ((t = time (NULL)) == -1) {
-                    perror ("time");
-                    resp = -2;
-                } else {
-                    resp = t;
-                }
+            case LOGIN:
+                resp = 1;
                 break;
-            case LOAD:
-                bad_cmds = 0;
-                pthread_mutex_lock (&num_threads_lock);
-                resp = num_threads;
-                pthread_mutex_unlock (&num_threads_lock);
+            case LOGOUT:
+                resp = 2;
                 break;
-            case EXIT:
-                resp = 0;
-                done = true;
+            case LIST:
+                resp = 3;
                 break;
             case CLOSED:
                 goto cleanup;
             case INVALID:
-                puts ("got invalid command"); fflush (stdout);
-                if (++bad_cmds > 2)
-                    done = true;
                 resp = -1;
                 break;
         }
 
         // send response
         off = 0;
-        //enc = htonl (resp);
-        enc = resp;
+        enc = htonl (resp);
         while ((rc = send (sock, (char*) &enc + off, 4 - off, 0)) != 4 - off)
             off += rc;
     }
