@@ -16,77 +16,70 @@
 
 #include "common.h"
 
-/* use separate enums for request id and command recognition state; this
- * makes it easier to extend the FSM */
-enum req_id { LOGIN, LOGOUT, LIST, INVALID, CLOSED };
-enum state  { STATE_LOGIN, STATE_LOGOUT, STATE_LIST, STATE_INIT };
+#define BUF_SIZE 100
+#define MSG_MAX  100
 
-struct cmd {
-    const char *str; // string
-    size_t     tp;   // termination point (i.e. when to stop reading)
+/* receive buffer (used only by recv_char) */
+struct recv_buf {
+    char data[BUF_SIZE];
+    ssize_t pos;
+    ssize_t len;
 };
 
-/* a 'smart' data structure to simplify the code later.
- * commands are indexed by the corresponding state enum */
-struct cmd cmds[4] = {
-    [STATE_LOGIN]  = { "in",   2 },
-    [STATE_LOGOUT] = { "out",  3 },
-    [STATE_LIST]   = { "list", 4 },
-    [STATE_INIT]   = { "",     1 } // 1 to accomodate initial state
+/* the message delimiter sequence */
+static const struct {
+    const char *str;
+    size_t len;
+} delim = {
+    "\r\n\r\n",
+    4
 };
+
+static inline bool cmd_equal (const char *str, const char *cmd, size_t len) {
+    return !strncmp (str, cmd, len) && str[len] == '\0';
+}
 
 /*-----------------------------------------------------------------------------
- * Receives bytes from the given socket one at a time until either a valid
- * command is recognized, or an invalid sequence of bytes is detected */
+ * Reads a byte from the buffer, receiving more bytes from the socket if the
+ * buffer is empty */
 //-----------------------------------------------------------------------------
-static enum req_id get_request (long sock) {
-    char c;
-    size_t i;
-    ssize_t rc;
-    enum state state = STATE_INIT;
+static char recv_char (long sock, struct recv_buf *buf) {
 
-    for (i = 0;i < cmds[state].tp; i++) {
-        if ((rc = recv (sock, &c, 1, 0)) == -1) {
-            perror ("recv");
-            return CLOSED;
-        } else if (!rc) {
-            return CLOSED;
-        }
+    if (buf->pos == buf->len) {
+        buf->pos = 0;
+        if ((buf->len = recv (sock, buf->data, BUF_SIZE, 0)) == -1)
+            return -1;
+        if (!buf->len)
+            return -2;
+    }
+    buf->pos++;
+    return buf->data[buf->pos - 1];
+}
 
-        // ETX
-        if (c == 3)
-            return CLOSED;
+/*-----------------------------------------------------------------------------
+ * Reads into the buffer (buf) until either the delimiter sequence is found or
+ * the maximum message size (MSG_MAX) is reached.  Returns the message size on
+ * a successful read, or 0 if the client closed the connection */
+//-----------------------------------------------------------------------------
+static size_t read_msg (long sock, struct recv_buf *recv_buf, char *msg_buf) {
+    size_t i, delim_pos;
 
-        // initial state
-        if (state == STATE_INIT) {
-            if (c == cmds[STATE_LOGIN].str[0])
-                state = STATE_LOGIN;
-            else if (c == cmds[STATE_LOGOUT].str[0])
-                state = STATE_LOGOUT;
-            else if (c == cmds[STATE_LIST].str[0])
-                state = STATE_LIST;
-            else
-                return INVALID;
-        }
+    for (i = 0, delim_pos = 0; i < MSG_MAX-1 && delim_pos < delim.len; i++) {
 
-        // all command recognition states are essentially the same:
-        // either transition to the 'next' state (i++) or the invalid state
-        if (c != cmds[state].str[i])
-            return INVALID;
+        char c = recv_char (sock, recv_buf);
+        if (c < 0)
+            return 0;
+
+        if (c == delim.str[delim_pos])
+            delim_pos++;
+        else
+            delim_pos = 0;
+
+        msg_buf[i] = c;
     }
 
-    // map state to request
-    switch (state) {
-    case STATE_LOGIN:
-        return LOGIN;
-    case STATE_LOGOUT:
-        return LOGOUT;
-    case STATE_LIST:
-        return LIST;
-    default:
-        return INVALID;
-    }
-    return INVALID;
+    msg_buf[i] = '\0';
+    return i;
 }
 
 /*-----------------------------------------------------------------------------
@@ -99,25 +92,49 @@ void *handle_request (void *data) {
     long sock;
     bool done;
 
+    char msg_buf[MSG_MAX];
+    char *cmd, *ip, *port;
+
+    struct recv_buf recv_buf = { .pos = 0, .len = 0 };
+
+    // TODO: send char* responses
+    const int good = 'g' << 24 | 'o' << 16 | 'o' << 8 | 'd';
+    const int bad  = 'b' << 16 | 'a' << 8 | 'd';
+
     sock = (long) data;
     done = false;
 
     while (!done) {
-        switch (get_request (sock)) {
-            case LOGIN:
-                resp = 1;
-                break;
-            case LOGOUT:
-                resp = 2;
-                break;
-            case LIST:
-                resp = 3;
-                break;
-            case CLOSED:
-                goto cleanup;
-            case INVALID:
-                resp = -1;
-                break;
+        resp = good;
+        if (!read_msg (sock, &recv_buf, msg_buf))
+            goto cleanup;
+
+        if (!(cmd = strtok (msg_buf, " \r\n"))) {
+            resp = bad;
+        } else if (cmd_equal (cmd, "CONNECT", 7)) {
+
+            ip = strtok (NULL, " ");
+            port = strtok (NULL, " ");
+            if (!ip || !port) {
+                resp = bad;
+            } else {
+                printf ("%s: %s %s\n", cmd, ip, port);
+            }
+        } else if (cmd_equal (cmd, "DISCONNECT", 10)) {
+
+            ip = strtok (NULL, " ");
+            port = strtok (NULL, " ");
+            if (!ip || !port) {
+                resp = bad;
+            } else {
+                printf ("%s: %s %s\n", cmd, ip, port);
+            }
+        } else if (cmd_equal (cmd, "LIST", 4)) {
+
+        } else if (cmd_equal (cmd, "EXIT", 4)) {
+            done = true;
+        } else {
+            resp = bad;
         }
 
         // send response
