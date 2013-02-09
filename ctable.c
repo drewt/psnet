@@ -4,7 +4,7 @@
 #include "ctable.h"
 
 struct ct_node {
-    data_t *data;
+    const data_t *data;
     unsigned int delta;      // delta for delta list
     struct ct_node *ht_next; // hash table next pointer
     struct ct_node *dl_next; // delta list next pointer
@@ -15,9 +15,9 @@ static struct {
     unsigned int delta;
     struct ct_node *delta_head;
     struct ct_node *delta_tail;
-    unsigned int (* const hash)(data_t*);
-    bool (* const equals)(data_t*,data_t*);
-    void (* const act)(data_t*);
+    unsigned int (* const hash)(const data_t*);
+    bool (* const equals)(const data_t*,const data_t*);
+    void (* const act)(const data_t*);
     struct ct_node *table[HT_SIZE];
 } hash_table = {
     .delta = 0,
@@ -84,7 +84,7 @@ static void delta_insert (struct ct_node *node) {
 /*-----------------------------------------------------------------------------
  * Inserts an element into the table */
 //-----------------------------------------------------------------------------
-int *ctable_insert (data_t *data) {
+int *ctable_insert (const data_t *data) {
     struct ct_node *node;
 
     node = malloc (sizeof (struct ct_node));
@@ -102,7 +102,7 @@ int *ctable_insert (data_t *data) {
  * `prev' is not NULL, then prev will be set to the previous element in the
  * hash table bucket when this function returns */
 //-----------------------------------------------------------------------------
-static struct ct_node *get_node (data_t *data, struct ct_node **prev) {
+static struct ct_node *get_node (const data_t *data, struct ct_node **prev) {
 
     unsigned int index;
     struct ct_node *it, *last;
@@ -125,7 +125,7 @@ static struct ct_node *get_node (data_t *data, struct ct_node **prev) {
 /*-----------------------------------------------------------------------------
  * Removes an element from the table */
 //-----------------------------------------------------------------------------
-int *ctable_remove (data_t *data) {
+int *ctable_remove (const data_t *data) {
     unsigned int index;
     struct ct_node *node, *prev;
 
@@ -161,7 +161,7 @@ int *ctable_remove (data_t *data) {
  * Returns true if the given element exists in the table, or false if it does
  * not */
 //-----------------------------------------------------------------------------
-bool ctable_contains (data_t *data) {
+bool ctable_contains (const data_t *data) {
     return get_node (data, NULL) ? true : false;
 }
 
@@ -170,7 +170,7 @@ bool ctable_contains (data_t *data) {
  * defined by the function dh_equals) if such an element exists.  Otherwise
  * returns NULL */
 //-----------------------------------------------------------------------------
-data_t *ctable_get (data_t *data) {
+const data_t *ctable_get (const data_t *data) {
     struct ct_node *node;
 
     if ((node = get_node (data, NULL)))
