@@ -16,8 +16,8 @@ typedef struct client data_t;
 
 /* defined in ctable.c */
 int ctable_tick (void);
-int *ctable_insert (const data_t *data);
-int *ctable_remove (const data_t *data);
+int ctable_insert (const data_t *data);
+int ctable_remove (const data_t *data);
 bool ctable_contains (const data_t *data);
 const data_t *ctable_get (const data_t *data);
 void ctable_clear (void);

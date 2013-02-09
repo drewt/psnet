@@ -84,8 +84,10 @@ static void delta_insert (struct ct_node *node) {
 /*-----------------------------------------------------------------------------
  * Inserts an element into the table */
 //-----------------------------------------------------------------------------
-int *ctable_insert (const data_t *data) {
+int ctable_insert (const data_t *data) {
     struct ct_node *node;
+
+    ctable_remove (data);
 
     node = malloc (sizeof (struct ct_node));
     node->data = data;
@@ -123,13 +125,15 @@ static struct ct_node *get_node (const data_t *data, struct ct_node **prev) {
 }
 
 /*-----------------------------------------------------------------------------
- * Removes an element from the table */
+ * Removes an element from the table.  Returns 0 on success, or -1 if the given
+ * element is not in the table */
 //-----------------------------------------------------------------------------
-int *ctable_remove (const data_t *data) {
+int ctable_remove (const data_t *data) {
     unsigned int index;
     struct ct_node *node, *prev;
 
-    node = get_node (data, &prev);
+    if (!(node = get_node (data, &prev)))
+        return -1;
 
     // remove from hash table
     if (prev) {
@@ -139,7 +143,7 @@ int *ctable_remove (const data_t *data) {
         hash_table.table[index] = node->ht_next;
     }
 
-    // adjust deltas
+    // remove from delta list
     if (node->dl_next) {
         node->dl_next->delta += node->delta;
         node->dl_next->dl_prev = node->dl_prev;
@@ -147,7 +151,6 @@ int *ctable_remove (const data_t *data) {
         hash_table.delta -= node->delta;
     }
 
-    // adjust links in delta list
     if (node->dl_prev)
         node->dl_prev->dl_next = node->dl_next;
     else
