@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror -std=c99 -pthread
+CFLAGS = -Wall -Wextra -Werror -std=gnu99 -pthread
 
-OFILES = server.o service.o
+OFILES = server.o service.o #ctable.o
 
 all: server
 
