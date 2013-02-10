@@ -201,3 +201,21 @@ void ctable_clear (void) {
     for (int i = 0; i < HT_SIZE; i++)
         hash_table.table[i] = NULL;
 }
+
+/*-----------------------------------------------------------------------------
+ * */
+//-----------------------------------------------------------------------------
+const data_t *ctable_head (void) {
+    return hash_table.delta_head ? hash_table.delta_head->data : NULL;
+}
+
+/*-----------------------------------------------------------------------------
+ * */
+//-----------------------------------------------------------------------------
+const data_t *ctable_next (const data_t *it) {
+    struct ct_node *it_node;
+
+    if (!(it_node = get_node (it, NULL)))
+        return NULL;
+    return it_node->dl_next ? it_node->dl_next->data : NULL;
+}
