@@ -151,8 +151,10 @@ int ctable_remove (const data_t *data) {
 
     pthread_mutex_lock (&ctable_lock);
 
-    if (!(node = get_node (data, &prev)))
+    if (!(node = get_node (data, &prev))) {
+        pthread_mutex_unlock (&ctable_lock);
         return -1;
+    }
 
     // remove from hash table
     if (prev) {
