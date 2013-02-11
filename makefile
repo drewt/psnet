@@ -8,7 +8,10 @@ all: server
 server: $(OFILES) ctable.o
 	$(CC) $(CFLAGS) $(OFILES) -o server
 
+test: ctable_test.o ctable.o
+	$(CC) $(CFLAGS) ctable_test.o ctable.o -o test
+
 $(OFILES): common.h
 
 clean:
-	rm $(OFILES) server
+	rm $(OFILES) ctable_test.o ctable.o server test
