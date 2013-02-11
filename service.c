@@ -43,7 +43,7 @@ static inline bool cmd_equal (const char *str, const char *cmd, size_t len) {
  * Reads a byte from the buffer, receiving more bytes from the socket if the
  * buffer is empty */
 //-----------------------------------------------------------------------------
-static char recv_char (long sock, struct recv_buf *buf) {
+static char recv_char (int sock, struct recv_buf *buf) {
 
     if (buf->pos == buf->len) {
         buf->pos = 0;
@@ -61,7 +61,7 @@ static char recv_char (long sock, struct recv_buf *buf) {
  * the maximum message size (MSG_MAX) is reached.  Returns the message size on
  * a successful read, or 0 if the client closed the connection */
 //-----------------------------------------------------------------------------
-static size_t read_msg (long sock, struct recv_buf *recv_buf, char *msg_buf) {
+static size_t read_msg (int sock, struct recv_buf *recv_buf, char *msg_buf) {
     size_t i, delim_pos;
 
     for (i = 0, delim_pos = 0; i < MSG_MAX-1 && delim_pos < delim.len; i++) {
@@ -89,11 +89,11 @@ void *handle_request (void *data) {
 
     ssize_t off, rc;
     uint32_t resp, enc;
-    long sock;
     bool done;
+    struct conn_info *info;
 
     char msg_buf[MSG_MAX];
-    char *cmd, *ip, *port;
+    char *cmd, *port;
 
     struct recv_buf recv_buf = { .pos = 0, .len = 0 };
 
@@ -101,33 +101,29 @@ void *handle_request (void *data) {
     const int good = 'g' << 24 | 'o' << 16 | 'o' << 8 | 'd';
     const int bad  = 'b' << 16 | 'a' << 8 | 'd';
 
-    sock = (long) data;
+    info = data;
     done = false;
 
     while (!done) {
         resp = good;
-        if (!read_msg (sock, &recv_buf, msg_buf))
+        if (!read_msg (info->sock, &recv_buf, msg_buf))
             goto cleanup;
 
         if (!(cmd = strtok (msg_buf, " \r\n"))) {
             resp = bad;
         } else if (cmd_equal (cmd, "CONNECT", 7)) {
 
-            ip = strtok (NULL, " ");
-            port = strtok (NULL, " ");
-            if (!ip || !port) {
+            if (!(port = strtok (NULL, " "))) {
                 resp = bad;
             } else {
-                printf ("%s: %s %s\n", cmd, ip, port);
+                printf ("%s: %s %s\n", cmd, info->addr, port);
             }
         } else if (cmd_equal (cmd, "DISCONNECT", 10)) {
 
-            ip = strtok (NULL, " ");
-            port = strtok (NULL, " ");
-            if (!ip || !port) {
+            if (!(port = strtok (NULL, " "))) {
                 resp = bad;
             } else {
-                printf ("%s: %s %s\n", cmd, ip, port);
+                printf ("%s: %s %s\n", cmd, info->addr, port);
             }
         } else if (cmd_equal (cmd, "LIST", 4)) {
 
@@ -140,13 +136,14 @@ void *handle_request (void *data) {
         // send response
         off = 0;
         enc = htonl (resp);
-        while ((rc = send (sock, (char*) &enc + off, 4 - off, 0)) != 4 - off)
+        while ((rc = send (info->sock, (char*)&enc + off, 4-off, 0)) != 4-off)
             off += rc;
     }
 
 cleanup:
     puts ("closing connection to client"); fflush (stdout);
-    close (sock);
+    close (info->sock);
+    free (info);
     pthread_mutex_lock (&num_threads_lock);
     num_threads--;
     pthread_mutex_unlock (&num_threads_lock);

@@ -31,6 +31,13 @@ static void usage (void) {
     exit (1);
 }
 
+void *get_in_addr (struct sockaddr *sa) {
+    if (sa->sa_family == AF_INET)
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
+
 int main (int argc, char *argv[]) {
 
     char *endptr;
@@ -130,8 +137,15 @@ int main (int argc, char *argv[]) {
         num_threads++;
         pthread_mutex_unlock (&num_threads_lock);
 
+        struct conn_info *targ = malloc (sizeof (struct conn_info));
+        targ->sock = new_fd;
+        inet_ntop (their_addr.ss_family,
+                get_in_addr ((struct sockaddr*) &their_addr),
+                targ->addr, sizeof targ->addr);
+        printf ("connection from %s\n", targ->addr);
+
         // create a new thread to service the connection
-        if (pthread_create (&tid, NULL, handle_request, (void*) new_fd))
+        if (pthread_create (&tid, NULL, handle_request, targ))
             perror ("pthread_create");
     }
 

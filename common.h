@@ -3,7 +3,13 @@
  * Author: Drew Thoreson
  */
 
+#include <netinet/in.h>
 #include <pthread.h>
+
+struct conn_info {
+    int sock;
+    char addr[INET6_ADDRSTRLEN];
+};
 
 void *handle_request (void *data);
 
