@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "ctable.h"
 
@@ -28,14 +29,24 @@ static struct {
     .act = ctable_act
 };
 
+static pthread_mutex_t ctable_lock;
+
+void ctable_init (void) {
+    pthread_mutex_init (&ctable_lock, NULL);
+}
+
 /*-----------------------------------------------------------------------------
  * Increases "time" by one tick */
 //-----------------------------------------------------------------------------
 int ctable_tick (void) {
     struct ct_node *tmp;
 
-    if (!hash_table.delta_head)
+    pthread_mutex_lock (&ctable_lock);
+
+    if (!hash_table.delta_head) {
+        pthread_mutex_unlock (&ctable_lock);
         return 0;
+    }
 
     hash_table.delta--;
     hash_table.delta_head->delta--;
@@ -45,8 +56,12 @@ int ctable_tick (void) {
         tmp = hash_table.delta_head;
         hash_table.delta_head = hash_table.delta_head->dl_next;
         hash_table.act (tmp->data);
+
+        pthread_mutex_unlock (&ctable_lock);
         ctable_remove (tmp->data);
+        pthread_mutex_lock (&ctable_lock);
     }
+    pthread_mutex_unlock (&ctable_lock);
     return 0;
 }
 
@@ -92,8 +107,10 @@ int ctable_insert (const data_t *data) {
     node = malloc (sizeof (struct ct_node));
     node->data = data;
 
+    pthread_mutex_lock (&ctable_lock);
     hash_insert (node);
     delta_insert (node);
+    pthread_mutex_unlock (&ctable_lock);
 
     return 0;
 }
@@ -132,6 +149,8 @@ int ctable_remove (const data_t *data) {
     unsigned int index;
     struct ct_node *node, *prev;
 
+    pthread_mutex_lock (&ctable_lock);
+
     if (!(node = get_node (data, &prev)))
         return -1;
 
@@ -157,6 +176,8 @@ int ctable_remove (const data_t *data) {
         hash_table.delta_head = node->dl_next;
 
     free (node);
+
+    pthread_mutex_unlock (&ctable_lock);
     return 0;
 }
 
@@ -165,7 +186,11 @@ int ctable_remove (const data_t *data) {
  * not */
 //-----------------------------------------------------------------------------
 bool ctable_contains (const data_t *data) {
-    return get_node (data, NULL) ? true : false;
+    pthread_mutex_lock (&ctable_lock);
+    struct ct_node *rv = get_node (data, NULL);
+    pthread_mutex_unlock (&ctable_lock);
+
+    return rv ? true : false;
 }
 
 /*-----------------------------------------------------------------------------
@@ -176,9 +201,11 @@ bool ctable_contains (const data_t *data) {
 const data_t *ctable_get (const data_t *data) {
     struct ct_node *node;
 
-    if ((node = get_node (data, NULL)))
-        return node->data;
-    return NULL;
+    pthread_mutex_lock (&ctable_lock);
+    node = get_node (data, NULL);
+    pthread_mutex_unlock (&ctable_lock);
+
+    return node ? node->data : NULL;
 }
 
 /*-----------------------------------------------------------------------------
@@ -186,6 +213,8 @@ const data_t *ctable_get (const data_t *data) {
 //-----------------------------------------------------------------------------
 void ctable_clear (void) {
     struct ct_node *it, *tmp;
+
+    pthread_mutex_lock (&ctable_lock);
 
     it = hash_table.delta_head;
     while (it) {
@@ -200,13 +229,19 @@ void ctable_clear (void) {
 
     for (int i = 0; i < HT_SIZE; i++)
         hash_table.table[i] = NULL;
+
+    pthread_mutex_unlock (&ctable_lock);
 }
 
 /*-----------------------------------------------------------------------------
  * */
 //-----------------------------------------------------------------------------
 const data_t *ctable_head (void) {
-    return hash_table.delta_head ? hash_table.delta_head->data : NULL;
+    pthread_mutex_lock (&ctable_lock);
+    const data_t *rv = hash_table.delta_head ? hash_table.delta_head->data :
+                                               NULL;
+    pthread_mutex_unlock (&ctable_lock);
+    return rv;
 }
 
 /*-----------------------------------------------------------------------------
