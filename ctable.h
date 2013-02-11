@@ -9,7 +9,7 @@
 #endif
 
 #ifndef INTERVAL_SECONDS
-#define INTERVAL_SECONDS 10
+#define INTERVAL_SECONDS 60
 #endif
 
 #ifndef HT_SIZE
@@ -25,7 +25,7 @@ int ctable_remove (const data_t *data);
 bool ctable_contains (const data_t *data);
 const data_t *ctable_get (const data_t *data);
 void ctable_clear (void);
-void ctable_foreach (int (*fun)(const data_t *it));
+void ctable_foreach (int (*fun)(const data_t *it, void *arg), void *arg);
 
 /* to be defined in another module */
 extern unsigned int ctable_hash (const data_t*);

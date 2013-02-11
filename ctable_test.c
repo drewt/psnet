@@ -27,7 +27,7 @@ int hash_test (void) {
 
     // repeatedly fill & empty buckets
     for (int i = 0; i < 2; i++) {
-        for (int j = 0; i < HT_SIZE; i++) {
+        for (int j = 0; j < HT_SIZE; j++) {
             if (ctable_contains (&data[j])) {
                 printf ("error: %d in table\n", data[j].id);
                 return 1;
@@ -112,6 +112,36 @@ int delta_test (void) {
     return 0;
 }
 
+struct clist {
+    struct client *data[5];
+    unsigned int pos;
+};
+
+static int foreach_f (const struct client *client, void *arg) {
+    struct clist *list = arg;
+    list->data[list->pos] = (struct client*) client;
+    list->pos++;
+    return 0;
+}
+
+int iter_test (void) {
+    struct client clients[5];
+    struct clist list = { .pos = 0 };
+
+    for (size_t i = 0; i < LENGTH(clients); i++) {
+        clients[i].id = i;
+        ctable_insert (&clients[i]);
+    }
+
+    ctable_foreach (foreach_f, &list);
+
+    for (size_t i = 0; i < LENGTH(list.data); i++) {
+        if (list.data[i]->id != (int) i)
+            return 1;
+    }
+    return 0;
+}
+
 int main (void) {
     int rc;
 
@@ -124,6 +154,10 @@ int main (void) {
     if ((rc = delta_test ())) {
         printf ("delta_test returned %d\n", rc);
         return 2;
+    }
+    if ((rc = iter_test ())) {
+        printf ("iter_test returned %d\n", rc);
+        return 3;
     }
     return 0;
 }
