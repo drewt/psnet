@@ -25,8 +25,7 @@ int ctable_remove (const data_t *data);
 bool ctable_contains (const data_t *data);
 const data_t *ctable_get (const data_t *data);
 void ctable_clear (void);
-const data_t *ctable_head (void);
-const data_t *ctable_next (const data_t *it);
+void ctable_foreach (int (*fun)(const data_t *it));
 
 /* to be defined in another module */
 extern unsigned int ctable_hash (const data_t*);

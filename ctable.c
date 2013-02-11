@@ -260,23 +260,16 @@ void ctable_clear (void) {
 }
 
 /*-----------------------------------------------------------------------------
- * */
+ * Calls the function `fun' on each element in the list.  A non-zero return
+ * value from `fun' is taken to indicate that iteration should cease */
 //-----------------------------------------------------------------------------
-const data_t *ctable_head (void) {
+void ctable_foreach (int (*fun)(const data_t *it)) {
+    struct ct_node *it;
+
     pthread_mutex_lock (&ctable_lock);
-    const data_t *rv = hash_table.delta_head ? hash_table.delta_head->data :
-                                               NULL;
+    for (it = hash_table.delta_head; it; it = it->dl_next) {
+        if (fun (it->data))
+            break;
+    }
     pthread_mutex_unlock (&ctable_lock);
-    return rv;
-}
-
-/*-----------------------------------------------------------------------------
- * */
-//-----------------------------------------------------------------------------
-const data_t *ctable_next (const data_t *it) {
-    struct ct_node *it_node;
-
-    if (!(it_node = get_node (it, NULL)))
-        return NULL;
-    return it_node->dl_next ? it_node->dl_next->data : NULL;
 }
