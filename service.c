@@ -19,6 +19,10 @@
 #define BUF_SIZE 100
 #define MSG_MAX  100
 
+#define ANSI_GREEN "\x1b[32m"
+#define ANSI_RED   "\x1b[31m"
+#define ANSI_RESET "\x1b[0m"
+
 /* receive buffer (used only by recv_char) */
 struct recv_buf {
     char data[BUF_SIZE];
@@ -82,13 +86,25 @@ static size_t read_msg (int sock, struct recv_buf *recv_buf, char *msg_buf) {
     return i;
 }
 
+static int send_msg (int sock, char *buf, size_t len) {
+    ssize_t rc;
+    size_t sent = 0;
+
+    while (sent != len) {
+        if ((rc = send (sock, buf + sent, len - sent, 0)) == -1)
+            return -1;
+        sent += rc;
+    }
+    return 0;
+}
+
 /*-----------------------------------------------------------------------------
  * Handles requests from the client */
 //-----------------------------------------------------------------------------
 void *handle_request (void *data) {
 
-    ssize_t off, rc;
-    uint32_t resp, enc;
+    //ssize_t off, rc;
+    char *resp;
     bool done;
     struct conn_info *info;
 
@@ -97,9 +113,8 @@ void *handle_request (void *data) {
 
     struct recv_buf recv_buf = { .pos = 0, .len = 0 };
 
-    // TODO: send char* responses
-    const int good = 'g' << 24 | 'o' << 16 | 'o' << 8 | 'd';
-    const int bad  = 'b' << 16 | 'a' << 8 | 'd';
+    char *good = "OK\n";
+    char *bad  = "ER\n";
 
     info = data;
     done = false;
@@ -113,17 +128,17 @@ void *handle_request (void *data) {
             resp = bad;
         } else if (cmd_equal (cmd, "CONNECT", 7)) {
 
-            if (!(port = strtok (NULL, " "))) {
+            if (!(port = strtok (NULL, " \r\n"))) {
                 resp = bad;
             } else {
-                printf ("%s: %s %s\n", cmd, info->addr, port);
+                printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->addr, port);
             }
         } else if (cmd_equal (cmd, "DISCONNECT", 10)) {
 
-            if (!(port = strtok (NULL, " "))) {
+            if (!(port = strtok (NULL, " \r\n"))) {
                 resp = bad;
             } else {
-                printf ("%s: %s %s\n", cmd, info->addr, port);
+                printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);
             }
         } else if (cmd_equal (cmd, "LIST", 4)) {
 
@@ -133,15 +148,11 @@ void *handle_request (void *data) {
             resp = bad;
         }
 
-        // send response
-        off = 0;
-        enc = htonl (resp);
-        while ((rc = send (info->sock, (char*)&enc + off, 4-off, 0)) != 4-off)
-            off += rc;
+        send_msg (info->sock, resp, 3);
     }
 
 cleanup:
-    puts ("closing connection to client"); fflush (stdout);
+    printf ("closing connection to %s\n", info->addr); fflush (stdout);
     close (info->sock);
     free (info);
     pthread_mutex_lock (&num_threads_lock);
