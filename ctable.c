@@ -1,8 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <unistd.h>
 
 #include "ctable.h"
+
+static void ctable_tick ();
 
 struct ct_node {
     const data_t *data;
@@ -12,14 +15,18 @@ struct ct_node {
     struct ct_node *dl_prev; // delta list prev pointer
 };
 
+/* metadata structure */
 static struct {
-    unsigned int delta;
-    struct ct_node *delta_head;
-    struct ct_node *delta_tail;
+    unsigned int delta;         // sum of all individual deltas
+    struct ct_node *delta_head; // head of the delta list
+    struct ct_node *delta_tail; // tail of the delta list
+
+    /* functions that operate on data_t */
     unsigned int (* const hash)(const data_t*);
     bool (* const equals)(const data_t*,const data_t*);
     void (* const act)(const data_t*);
-    struct ct_node *table[HT_SIZE];
+
+    struct ct_node *table[HT_SIZE]; // memory for the hash table
 } hash_table = {
     .delta = 0,
     .delta_head = NULL,
@@ -29,23 +36,41 @@ static struct {
     .act = ctable_act
 };
 
+/* XXX: global mutex to protect data structure;
+ * consider replacing with read-write lock */
 static pthread_mutex_t ctable_lock;
 
+/*-----------------------------------------------------------------------------
+ * Clock thread: periodically calls the ctable_tick() function  */
+//-----------------------------------------------------------------------------
+static void __attribute((noreturn)) *ctable_clock_thread () {
+    for (;;) {
+        sleep (INTERVAL_SECONDS);
+        ctable_tick ();
+    }
+}
+
+/*-----------------------------------------------------------------------------
+ * Initializes the ctable */
+//-----------------------------------------------------------------------------
 void ctable_init (void) {
+    pthread_t tid;
+
     pthread_mutex_init (&ctable_lock, NULL);
+    pthread_create (&tid, NULL, ctable_clock_thread, NULL);
 }
 
 /*-----------------------------------------------------------------------------
  * Increases "time" by one tick */
 //-----------------------------------------------------------------------------
-int ctable_tick (void) {
+static void ctable_tick () {
     struct ct_node *tmp;
 
     pthread_mutex_lock (&ctable_lock);
 
     if (!hash_table.delta_head) {
         pthread_mutex_unlock (&ctable_lock);
-        return 0;
+        return;
     }
 
     hash_table.delta--;
@@ -62,7 +87,6 @@ int ctable_tick (void) {
         pthread_mutex_lock (&ctable_lock);
     }
     pthread_mutex_unlock (&ctable_lock);
-    return 0;
 }
 
 /*-----------------------------------------------------------------------------

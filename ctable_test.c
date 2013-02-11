@@ -1,5 +1,9 @@
 #include <stdio.h>
+#include <pthread.h>
+#include <unistd.h>
 #include "ctable.h"
+
+#define LENGTH(arr) (sizeof (arr) / sizeof (*arr))
 
 struct client {
     int id;
@@ -15,41 +19,7 @@ void ctable_act (const struct client *client) {
     printf ("Removed client %d\n", client->id);
 }
 
-static int delta_test (void) {
-    struct client data[HT_SIZE];
-
-    for (int i = 0; i < HT_SIZE; i++)
-        data[i].id = i;
-
-    for (int i = 0; i < HT_SIZE-1; i++) {
-        if (ctable_contains (&data[i])) {
-            printf ("error: %d in table\n", data[i].id);
-            return 1;
-        }
-        ctable_insert (&data[i]);
-        if (!ctable_contains (&data[i])) {
-            printf ("error: %d not in table\n", data[i].id);
-            return 2;
-        }
-        ctable_tick ();
-    } ctable_insert (&data[HT_SIZE-1]);
-
-    for (int i = 0; i < HT_SIZE; i++) {
-        if (!ctable_contains (&data[i])) {
-            printf ("error: %d not in table\n", data[i].id);
-            return 3;
-        }
-        ctable_tick ();
-        if (ctable_contains (&data[i])) {
-            printf ("error: %d in table\n", data[i].id);
-            return 4;
-        }
-    }
-
-    return 0;
-}
-
-static int hash_test (void) {
+int hash_test (void) {
     struct client data[HT_SIZE*2];
 
     for (int i = 0; i < HT_SIZE*2; i++)
@@ -93,6 +63,7 @@ static int hash_test (void) {
         }
     }
 
+    // remove from the head of a bucket
     ctable_insert (&data[0]);
     ctable_insert (&data[HT_SIZE]);
     ctable_remove (&data[HT_SIZE]);
@@ -106,15 +77,45 @@ static int hash_test (void) {
     }
     ctable_remove (&data[0]);
     if (ctable_contains (&data[0])) {
-        printf ("error %d still in table\n", data[0].id);
+        printf ("error: %d still in table\n", data[0].id);
         return 10;
     }
 
     return 0;
 }
 
+int delta_test (void) {
+    struct client clients[5];
+
+    for (size_t i = 0; i < LENGTH(clients); i++) {
+        clients[i].id = i;
+        ctable_insert (&clients[i]);
+    }
+
+    sleep (EXP_INTERVAL*INTERVAL_SECONDS+1);
+
+    for (size_t i = 0; i < LENGTH(clients); i++) {
+        if (ctable_contains (&clients[i])) {
+            printf ("error: %d still in table\n", clients[i].id);
+            return 1;
+        }
+    }
+
+    for (size_t i = 0; i < LENGTH(clients); i++) {
+        ctable_insert (&clients[i]);
+        sleep (EXP_INTERVAL*INTERVAL_SECONDS+1);
+        if (ctable_contains (&clients[i])) {
+            printf ("error: %d still in table\n", clients[i].id);
+            return 2;
+        }
+    }
+    return 0;
+}
+
 int main (void) {
     int rc;
+
+    ctable_init ();
 
     if ((rc = hash_test ())) {
         printf ("hash_test returned %d\n", rc);

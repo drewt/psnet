@@ -1,11 +1,15 @@
 
-#ifndef _DELTAHASH_H_
-#define _DELTAHASH_H_
+#ifndef _CTABLE_H_
+#define _CTABLE_H_
 
 #include <stdbool.h>
 
 #ifndef EXP_INTERVAL
 #define EXP_INTERVAL 10
+#endif
+
+#ifndef INTERVAL_SECONDS
+#define INTERVAL_SECONDS 10
 #endif
 
 #ifndef HT_SIZE
@@ -15,7 +19,7 @@
 typedef struct client data_t;
 
 /* defined in ctable.c */
-int ctable_tick (void);
+void ctable_init (void);
 int ctable_insert (const data_t *data);
 int ctable_remove (const data_t *data);
 bool ctable_contains (const data_t *data);
