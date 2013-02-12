@@ -137,6 +137,9 @@ int main (int argc, char *argv[]) {
         num_threads++;
         pthread_mutex_unlock (&num_threads_lock);
 
+        struct timeval tv = { .tv_sec = 30, .tv_usec = 0 };
+        setsockopt (new_fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv, sizeof (tv));
+
         struct conn_info *targ = malloc (sizeof (struct conn_info));
         targ->sock = new_fd;
         inet_ntop (their_addr.ss_family,
