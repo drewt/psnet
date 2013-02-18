@@ -14,6 +14,7 @@ test: ctable_test.o ctable.o
 
 $(OFILES): common.h
 ctable.o: ctable.h
+client.o: client.h
 
 clean:
 	rm $(OFILES) ctable_test.o server test
