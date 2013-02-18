@@ -18,6 +18,7 @@
 #include <pthread.h>
 
 #include "common.h"
+#include "ctable.h"
 
 #define BACKLOG 10
 
@@ -114,6 +115,8 @@ int main (int argc, char *argv[]) {
         perror ("listen");
         exit (1);
     }
+
+    ctable_init ();
 
     for (;;) {
 

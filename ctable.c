@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -24,7 +25,7 @@ static struct {
     /* functions that operate on data_t */
     unsigned int (* const hash)(const data_t*);
     bool (* const equals)(const data_t*,const data_t*);
-    void (* const act)(const data_t*);
+    void (* const act)(data_t*);
 
     struct ct_node *table[HT_SIZE]; // memory for the hash table
 } hash_table = {
@@ -64,7 +65,7 @@ void ctable_init (void) {
  * Increases "time" by one tick */
 //-----------------------------------------------------------------------------
 static void ctable_tick () {
-    struct ct_node *tmp;
+    data_t *tmp_data;
 
     pthread_mutex_lock (&ctable_lock);
 
@@ -78,13 +79,14 @@ static void ctable_tick () {
 
     // remove any expired elements
     while (hash_table.delta_head && !hash_table.delta_head->delta) {
-        tmp = hash_table.delta_head;
+        tmp_data = (data_t*) hash_table.delta_head->data;
         hash_table.delta_head = hash_table.delta_head->dl_next;
-        hash_table.act (tmp->data);
 
         pthread_mutex_unlock (&ctable_lock);
-        ctable_remove (tmp->data);
+        ctable_remove (tmp_data);
         pthread_mutex_lock (&ctable_lock);
+
+        hash_table.act (tmp_data);
     }
     pthread_mutex_unlock (&ctable_lock);
 }

@@ -15,6 +15,7 @@
 #include <time.h>
 
 #include "common.h"
+#include "client.h"
 
 #define BUF_SIZE 100
 #define MSG_MAX  100
@@ -103,7 +104,6 @@ static int send_msg (int sock, char *buf, size_t len) {
 //-----------------------------------------------------------------------------
 void *handle_request (void *data) {
 
-    //ssize_t off, rc;
     char *resp;
     bool done;
     struct conn_info *info;
@@ -130,6 +130,8 @@ void *handle_request (void *data) {
 
             if (!(port = strtok (NULL, " \r\n"))) {
                 resp = bad;
+            } else if (add_client (info->addr, port)) {
+                resp = bad;
             } else {
                 printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->addr, port);
             }
@@ -137,11 +139,13 @@ void *handle_request (void *data) {
 
             if (!(port = strtok (NULL, " \r\n"))) {
                 resp = bad;
+            } else if (remove_client (info->addr, port)) {
+                resp = bad;
             } else {
                 printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);
             }
         } else if (cmd_equal (cmd, "LIST", 4)) {
-
+            clients_to_json ();
         } else if (cmd_equal (cmd, "EXIT", 4)) {
             done = true;
         } else {
