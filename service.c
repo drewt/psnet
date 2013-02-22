@@ -48,7 +48,7 @@ static inline bool cmd_equal (const char *str, const char *cmd, size_t len) {
  * Reads a byte from the buffer, receiving more bytes from the socket if the
  * buffer is empty */
 //-----------------------------------------------------------------------------
-static char recv_char (int sock, struct recv_buf *buf) {
+static signed char recv_char (int sock, struct recv_buf *buf) {
 
     if (buf->pos == buf->len) {
         buf->pos = 0;
@@ -71,7 +71,7 @@ static size_t read_msg (int sock, struct recv_buf *recv_buf, char *msg_buf) {
 
     for (i = 0, delim_pos = 0; i < MSG_MAX-1 && delim_pos < delim.len; i++) {
 
-        char c = recv_char (sock, recv_buf);
+        signed char c = recv_char (sock, recv_buf);
         if (c < 0)
             return 0;
 
