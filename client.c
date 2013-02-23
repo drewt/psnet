@@ -4,6 +4,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
+#include "common.h"
 #include "client.h"
 #include "ctable.h"
 #include "cJSON.h"
@@ -33,7 +34,10 @@ bool ctable_equals (const struct client *a, const struct client *b) {
 
 void ctable_act (struct client *client) {
 #ifdef P2PSERV_LOG
-    printf ("Expiring (%d, %d)\n", client->ip, client->port); fflush (stdout);
+    char addr[20];
+    inet_ntop (AF_INET, &client->ip, addr, 20);
+    printf (ANSI_RED "X %s %d\n" ANSI_RESET, addr, client->port);
+    fflush (stdout);
 #endif
     free (client);
 }

@@ -20,10 +20,6 @@
 #define BUF_SIZE 100
 #define MSG_MAX  100
 
-#define ANSI_GREEN "\x1b[32m"
-#define ANSI_RED   "\x1b[31m"
-#define ANSI_RESET "\x1b[0m"
-
 /* receive buffer (used only by recv_char) */
 struct recv_buf {
     char data[BUF_SIZE];
@@ -165,7 +161,7 @@ else { printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);}
     }
 
 #ifdef P2PSERV_LOG
-    printf ("closing connection to %s\n", info->addr); fflush (stdout);
+    printf ("D %s\n", info->addr); fflush (stdout);
 #endif
     close (info->sock);
     free (info);
