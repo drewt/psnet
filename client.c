@@ -32,8 +32,9 @@ bool ctable_equals (const struct client *a, const struct client *b) {
 }
 
 void ctable_act (struct client *client) {
-    printf ("Expiring (%d, %d)\n", client->ip, client->port);
-    fflush (stdout);
+#ifdef P2PSERV_LOG
+    printf ("Expiring (%d, %d)\n", client->ip, client->port); fflush (stdout);
+#endif
     free (client);
 }
 

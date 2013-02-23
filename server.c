@@ -148,8 +148,9 @@ int main (int argc, char *argv[]) {
         inet_ntop (their_addr.ss_family,
                 get_in_addr ((struct sockaddr*) &their_addr),
                 targ->addr, sizeof targ->addr);
+#ifdef P2PSERV_LOG
         printf ("connection from %s\n", targ->addr);
-
+#endif
         // create a new thread to service the connection
         if (pthread_create (&tid, NULL, handle_request, targ))
             perror ("pthread_create");

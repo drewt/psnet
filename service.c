@@ -137,18 +137,20 @@ void *handle_request (void *data) {
                 response.str = strdup (bad);
             } else if (add_client (info->addr, port)) {
                 response.str = strdup (bad);
-            } else {
-                printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->addr, port);
             }
+#ifdef P2PSERV_LOG
+else { printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->addr, port); }
+#endif
         } else if (cmd_equal (cmd, "DISCONNECT", 10)) {
 
             if (!(port = strtok (NULL, " \r\n"))) {
                 response.str = strdup (bad);
             } else if (remove_client (info->addr, port)) {
                 response.str = strdup (bad);
-            } else {
-                printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);
             }
+#ifdef P2PSERV_LOG
+else { printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);}
+#endif
         } else if (cmd_equal (cmd, "LIST", 4)) {
             response.str = clients_to_json ();
             response.len = strlen (response.str);
@@ -162,7 +164,9 @@ void *handle_request (void *data) {
         free (response.str);
     }
 
+#ifdef P2PSERV_LOG
     printf ("closing connection to %s\n", info->addr); fflush (stdout);
+#endif
     close (info->sock);
     free (info);
     pthread_mutex_lock (&num_threads_lock);
