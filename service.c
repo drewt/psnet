@@ -35,10 +35,10 @@ struct recv_buf {
 static const struct {
     const char *str;
     size_t len;
-} delim = {
-    "\r\n\r\n",
-    4
-};
+} delim = { "\r\n\r\n", 4 };
+
+static const char * const good = "OK\r\n";
+static const char * const bad  = "ER\r\n";
 
 static inline bool cmd_equal (const char *str, const char *cmd, size_t len) {
     return !strncmp (str, cmd, len) && str[len] == '\0';
@@ -87,6 +87,9 @@ static size_t read_msg (int sock, struct recv_buf *recv_buf, char *msg_buf) {
     return i;
 }
 
+/*-----------------------------------------------------------------------------
+ * Sends `len' bytes from `buf' into the given socket */
+//-----------------------------------------------------------------------------
 static int send_msg (int sock, char *buf, size_t len) {
     ssize_t rc;
     size_t sent = 0;
@@ -104,7 +107,11 @@ static int send_msg (int sock, char *buf, size_t len) {
 //-----------------------------------------------------------------------------
 void *handle_request (void *data) {
 
-    char *resp;
+    struct {
+        char   *str;
+        size_t len;
+    } response;
+
     bool done;
     struct conn_info *info;
 
@@ -113,49 +120,48 @@ void *handle_request (void *data) {
 
     struct recv_buf recv_buf = { .pos = 0, .len = 0 };
 
-    char *good = "OK\n";
-    char *bad  = "ER\n";
-
     info = data;
     done = false;
 
     while (!done) {
-        resp = good;
+        response.str = strdup (good);
+        response.len = 4;
         if (!read_msg (info->sock, &recv_buf, msg_buf))
-            goto cleanup;
+            break;
 
         if (!(cmd = strtok (msg_buf, " \r\n"))) {
-            resp = bad;
+            response.str = strdup (bad);
         } else if (cmd_equal (cmd, "CONNECT", 7)) {
 
             if (!(port = strtok (NULL, " \r\n"))) {
-                resp = bad;
+                response.str = strdup (bad);
             } else if (add_client (info->addr, port)) {
-                resp = bad;
+                response.str = strdup (bad);
             } else {
                 printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->addr, port);
             }
         } else if (cmd_equal (cmd, "DISCONNECT", 10)) {
 
             if (!(port = strtok (NULL, " \r\n"))) {
-                resp = bad;
+                response.str = strdup (bad);
             } else if (remove_client (info->addr, port)) {
-                resp = bad;
+                response.str = strdup (bad);
             } else {
                 printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);
             }
         } else if (cmd_equal (cmd, "LIST", 4)) {
-            clients_to_json ();
+            response.str = clients_to_json ();
+            response.len = strlen (response.str);
         } else if (cmd_equal (cmd, "EXIT", 4)) {
             done = true;
         } else {
-            resp = bad;
+            response.str = strdup (bad);
         }
 
-        send_msg (info->sock, resp, 3);
+        send_msg (info->sock, response.str, response.len);
+        free (response.str);
     }
 
-cleanup:
     printf ("closing connection to %s\n", info->addr); fflush (stdout);
     close (info->sock);
     free (info);

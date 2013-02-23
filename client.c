@@ -6,6 +6,7 @@
 
 #include "client.h"
 #include "ctable.h"
+#include "cJSON.h"
 
 #define PORT_MIN 1024
 #define PORT_MAX 65535
@@ -91,9 +92,19 @@ int remove_client (const char *ip, const char *port) {
     return CL_OK;
 }
 
-static int print_client (const struct client *client, void *data) {
+int print_client (const struct client *client, void *data) {
     FILE *stream = data;
     fprintf (stream, "{ %d, %d }\n", client->ip, client->port);
+    return 0;
+}
+
+static int add_client_to_array (const struct client *client, void *data) {
+    cJSON *list = data;
+    cJSON *elm  = cJSON_CreateObject ();
+
+    cJSON_AddItemToArray (list, elm);
+    cJSON_AddNumberToObject (elm, "ip",   client->ip);
+    cJSON_AddNumberToObject (elm, "port", client->port);
     return 0;
 }
 
@@ -102,6 +113,13 @@ static int print_client (const struct client *client, void *data) {
  * network */
 //-----------------------------------------------------------------------------
 char *clients_to_json (void) {
-    ctable_foreach (print_client, stdout);
-    return NULL; // TODO
+
+    char *out;
+    cJSON *client_list = cJSON_CreateArray ();
+
+    ctable_foreach (add_client_to_array, client_list);
+    out = cJSON_PrintUnformatted (client_list);
+    cJSON_Delete (client_list);
+
+    return out; // XXX: must be freed by caller
 }
