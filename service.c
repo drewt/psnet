@@ -121,7 +121,7 @@ void *handle_request (void *data) {
 
     while (!done) {
         response.str = strdup (good);
-        response.len = 4;
+        response.len = 5;
         if (!read_msg (info->sock, &recv_buf, msg_buf))
             break;
 
@@ -149,7 +149,7 @@ else { printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);}
 #endif
         } else if (cmd_equal (cmd, "LIST", 4)) {
             response.str = clients_to_json ();
-            response.len = strlen (response.str);
+            response.len = strlen (response.str) + 1;
         } else if (cmd_equal (cmd, "EXIT", 4)) {
             done = true;
         } else {
