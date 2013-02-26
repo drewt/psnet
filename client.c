@@ -107,8 +107,12 @@ static int add_client_to_array (const struct client *client, void *data) {
     cJSON *list = data;
     cJSON *elm  = cJSON_CreateObject ();
 
+    // convert IP address to string in dotted decimal
+    char addr[20];
+    inet_ntop (AF_INET, &client->ip, addr, 20);
+
     cJSON_AddItemToArray (list, elm);
-    cJSON_AddNumberToObject (elm, "ip",   client->ip);
+    cJSON_AddStringToObject (elm, "ip",   addr);
     cJSON_AddNumberToObject (elm, "port", client->port);
     return 0;
 }
