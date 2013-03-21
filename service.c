@@ -35,6 +35,7 @@ static const struct {
 
 static const char * const good = "OK\r\n";
 static const char * const bad  = "ER\r\n";
+static const size_t def_len = 5;
 
 static inline bool cmd_equal (const char *str, const char *cmd, size_t len) {
     return !strncmp (str, cmd, len) && str[len] == '\0';
@@ -112,7 +113,7 @@ void *handle_request (void *data) {
     struct conn_info *info;
 
     char msg_buf[MSG_MAX];
-    char *cmd, *port;
+    char *cmd, *port, *p;
 
     struct recv_buf recv_buf = { .pos = 0, .len = 0 };
 
@@ -120,37 +121,43 @@ void *handle_request (void *data) {
     done = false;
 
     while (!done) {
-        response.str = strdup (good);
-        response.len = 5;
+        response.len = def_len;
         if (!read_msg (info->sock, &recv_buf, msg_buf))
             break;
 
-        if (!(cmd = strtok (msg_buf, " \r\n"))) {
+        if (!(cmd = strtok_r (msg_buf, " \r\n", &p))) {
             response.str = strdup (bad);
         } else if (cmd_equal (cmd, "CONNECT", 7)) {
 
-            if (!(port = strtok (NULL, " \r\n"))) {
+            if (!(port = strtok_r (NULL, " \r\n", &p)) ||
+                    add_client (info->addr, port)) {
                 response.str = strdup (bad);
-            } else if (add_client (info->addr, port)) {
-                response.str = strdup (bad);
-            }
+            } else {
+                response.str = strdup (good);
 #ifdef P2PSERV_LOG
-else { printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->addr, port); }
+                printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->addr, port);
 #endif
+            }
         } else if (cmd_equal (cmd, "DISCONNECT", 10)) {
 
-            if (!(port = strtok (NULL, " \r\n"))) {
+            if (!(port = strtok_r (NULL, " \r\n", &p)) ||
+                    remove_client (info->addr, port)) {
                 response.str = strdup (bad);
-            } else if (remove_client (info->addr, port)) {
-                response.str = strdup (bad);
-            }
+            } else {
+                response.str = strdup (good);
 #ifdef P2PSERV_LOG
-else { printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);}
+                printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);
 #endif
+            }
         } else if (cmd_equal (cmd, "LIST", 4)) {
-            response.str = clients_to_json ();
-            response.len = strlen (response.str) + 1;
+            if (!(port = strtok_r (NULL, " \r\n", &p)) ||
+                    clients_to_json (&response.str, info->addr, port)) {
+                response.str = strdup (bad);
+            } else {
+                response.len = strlen (response.str) + 1;
+            }
         } else if (cmd_equal (cmd, "EXIT", 4)) {
+            response.str = strdup (good);
             done = true;
         } else {
             response.str = strdup (bad);

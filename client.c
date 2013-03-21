@@ -103,15 +103,24 @@ int print_client (const struct client *client, void *data) {
     return 0;
 }
 
+struct foreach_arg {
+    cJSON *client_list;
+    struct client ignore;
+};
+
 static int add_client_to_array (const struct client *client, void *data) {
-    cJSON *list = data;
+
+    struct foreach_arg *arg = data;
+    if (ctable_equals (&arg->ignore, client))
+        return 0;
+
     cJSON *elm  = cJSON_CreateObject ();
 
     // convert IP address to string in dotted decimal
     char addr[20];
     inet_ntop (AF_INET, &client->ip, addr, 20);
 
-    cJSON_AddItemToArray (list, elm);
+    cJSON_AddItemToArray (arg->client_list, elm);
     cJSON_AddStringToObject (elm, "ip",   addr);
     cJSON_AddNumberToObject (elm, "port", client->port);
     return 0;
@@ -121,14 +130,19 @@ static int add_client_to_array (const struct client *client, void *data) {
  * Returns a JSON representation of the clients currently connected to the
  * network */
 //-----------------------------------------------------------------------------
-char *clients_to_json (void) {
+int clients_to_json (char **dest, const char *ip, const char *port) {
 
-    char *out;
-    cJSON *client_list = cJSON_CreateArray ();
+    int rc;
+    struct foreach_arg arg;
 
-    ctable_foreach (add_client_to_array, client_list);
-    out = cJSON_PrintUnformatted (client_list);
-    cJSON_Delete (client_list);
+    if ((rc = make_client (&arg.ignore, ip, port)))
+        return rc;
 
-    return out; // XXX: must be freed by caller
+    arg.client_list = cJSON_CreateArray ();
+
+    ctable_foreach (add_client_to_array, &arg);
+    *dest = cJSON_PrintUnformatted (arg.client_list);
+    cJSON_Delete (arg.client_list);
+
+    return CL_OK;
 }
