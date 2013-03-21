@@ -122,15 +122,21 @@ void *handle_request (void *data) {
 
     while (!done) {
         response.len = def_len;
+
+        // go to cleanup if connection was closed
         if (!read_msg (info->sock, &recv_buf, msg_buf))
             break;
 
-        if (!(cmd = strtok_r (msg_buf, " \r\n", &p))) {
+        // parse message
+        cmd  = strtok_r (msg_buf, " \r\n", &p);
+        port = strtok_r (NULL,    " \r\n", &p);
+
+        // construct response
+        if (!cmd) {
             response.str = strdup (bad);
         } else if (cmd_equal (cmd, "CONNECT", 7)) {
 
-            if (!(port = strtok_r (NULL, " \r\n", &p)) ||
-                    add_client (info->addr, port)) {
+            if (!port || add_client (info->addr, port)) {
                 response.str = strdup (bad);
             } else {
                 response.str = strdup (good);
@@ -140,8 +146,7 @@ void *handle_request (void *data) {
             }
         } else if (cmd_equal (cmd, "DISCONNECT", 10)) {
 
-            if (!(port = strtok_r (NULL, " \r\n", &p)) ||
-                    remove_client (info->addr, port)) {
+            if (!port || remove_client (info->addr, port)) {
                 response.str = strdup (bad);
             } else {
                 response.str = strdup (good);
@@ -150,8 +155,7 @@ void *handle_request (void *data) {
 #endif
             }
         } else if (cmd_equal (cmd, "LIST", 4)) {
-            if (!(port = strtok_r (NULL, " \r\n", &p)) ||
-                    clients_to_json (&response.str, info->addr, port)) {
+            if (!port || clients_to_json (&response.str, info->addr, port)) {
                 response.str = strdup (bad);
             } else {
                 response.len = strlen (response.str) + 1;
@@ -163,6 +167,7 @@ void *handle_request (void *data) {
             response.str = strdup (bad);
         }
 
+        // send response
         send_msg (info->sock, response.str, response.len);
         free (response.str);
     }
