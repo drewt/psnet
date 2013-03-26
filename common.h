@@ -6,9 +6,15 @@
 #include <netinet/in.h>
 #include <pthread.h>
 
-#define ANSI_GREEN  "\x1b[32m"
-#define ANSI_RED    "\x1b[31m"
-#define ANSI_RESET  "\x1b[0m"
+#ifdef DAEMON
+#define ANSI_GREEN ""
+#define ANSI_RED   ""
+#define ANSI_RESET ""
+#else
+#define ANSI_GREEN "\x1b[32m"
+#define ANSI_RED   "\x1b[31m"
+#define ANSI_RESET "\x1b[0m"
+#endif
 
 struct conn_info {
     int sock;

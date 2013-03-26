@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
@@ -22,14 +23,16 @@
 
 #define BACKLOG 10
 
+#define LOG_FILE_PATH "/tmp/p2pservlog"
+
 int num_threads;
 pthread_mutex_t num_threads_lock;
 
 static void usage (void) {
-    puts ("usage: mtserver [nclients] [port]\n"
+    puts ("usage: server [nclients] [port]\n"
           "\twhere 'nclients' is the maximum number of clients\n"
           "\tand 'port' is the port number to listen on");
-    exit (1);
+    exit (EXIT_FAILURE);
 }
 
 void *get_in_addr (struct sockaddr *sa) {
@@ -39,46 +42,57 @@ void *get_in_addr (struct sockaddr *sa) {
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int main (int argc, char *argv[]) {
+#ifdef DAEMON
+/*-----------------------------------------------------------------------------
+ * Run the server in the background */
+//-----------------------------------------------------------------------------
+void daemonize (void) {
+    pid_t pid, sid;
 
-    char *endptr;
-    int sockfd;
-    long new_fd;
+    pid = fork ();
+    if (pid == -1) {
+        perror ("fork");
+        exit (EXIT_FAILURE);
+    }
+    if (pid > 0)
+        exit (EXIT_SUCCESS);
+
+    umask (0);
+
+    freopen (LOG_FILE_PATH, "w", stdout);
+    freopen (LOG_FILE_PATH, "w", stderr);
+    fclose (stdin);
+
+    sid = setsid ();
+    if (sid == -1) {
+        perror ("setsid");
+        exit (EXIT_FAILURE);
+    }
+
+    if (chdir ("/") == -1) {
+        perror ("chdir");
+        exit (EXIT_FAILURE);
+    }
+}
+#endif
+
+/*-----------------------------------------------------------------------------
+ * Initialize the server to listen on the given port */
+//-----------------------------------------------------------------------------
+static int server_init (char *port) {
     struct addrinfo hints, *servinfo, *p;
-    struct sockaddr_storage their_addr;
-    socklen_t sin_size;
-    pthread_t tid;
     const int yes = 1;
+    int sockfd;
     int rc;
-
-    if (argc != 3)
-        usage ();
-
-    endptr = NULL;
-    const int max_threads = strtol (argv[1], &endptr, 10);
-    if (max_threads < 1 || (endptr && *endptr != '\0')) {
-        puts ("error: 'nclients' must be an integer greater than 0");
-        usage ();
-    }
-
-    endptr = NULL;
-    if (strtol (argv[2], &endptr, 10) < 1 || (endptr && *endptr != '\0')) {
-        puts ("error: 'port' must be an integer greater than 0");
-        usage ();
-    }
-
-    // initialize shared variable
-    num_threads = 0;
-    pthread_mutex_init (&num_threads_lock, NULL);
 
     memset (&hints, 0, sizeof (hints));
     hints.ai_family   = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags    = AI_PASSIVE;
 
-    if ((rc = getaddrinfo (NULL, argv[2], &hints, &servinfo))) {
+    if ((rc = getaddrinfo (NULL, port, &hints, &servinfo))) {
         fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (rc));
-        return 1;
+        exit (EXIT_FAILURE);
     }
 
     // create a socket to listen for incoming connections
@@ -92,7 +106,7 @@ int main (int argc, char *argv[]) {
         if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
                     sizeof (int)) == -1) {
             perror ("setsockopt");
-            exit (1);
+            exit (EXIT_FAILURE);
         }
 
         if (bind (sockfd, p->ai_addr, p->ai_addrlen) == -1) {
@@ -106,17 +120,30 @@ int main (int argc, char *argv[]) {
 
     if (!p) {
         fprintf (stderr, "server: failed to bind\n");
-        return 2;
+        exit (EXIT_FAILURE);
     }
 
     freeaddrinfo (servinfo);
 
     if (listen (sockfd, BACKLOG) == -1) {
         perror ("listen");
-        exit (1);
+        exit (EXIT_FAILURE);
     }
 
-    ctable_init ();
+    return sockfd;
+}
+
+/*-----------------------------------------------------------------------------
+ * The server's main accept() loop */
+//-----------------------------------------------------------------------------
+static void __attribute((noreturn)) server_main (int sockfd, int max_threads) {
+    struct sockaddr_storage their_addr;
+    socklen_t sin_size;
+    struct conn_info *targ;
+    pthread_t tid;
+    int new_fd;
+
+    struct timeval tv = { .tv_sec = 30, .tv_usec = 0 };
 
     for (;;) {
 
@@ -140,10 +167,9 @@ int main (int argc, char *argv[]) {
         num_threads++;
         pthread_mutex_unlock (&num_threads_lock);
 
-        struct timeval tv = { .tv_sec = 30, .tv_usec = 0 };
         setsockopt (new_fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv, sizeof (tv));
 
-        struct conn_info *targ = malloc (sizeof (struct conn_info));
+        targ = malloc (sizeof (struct conn_info));
         targ->sock = new_fd;
         inet_ntop (their_addr.ss_family,
                 get_in_addr ((struct sockaddr*) &their_addr),
@@ -155,6 +181,45 @@ int main (int argc, char *argv[]) {
         if (pthread_create (&tid, NULL, handle_request, targ))
             perror ("pthread_create");
     }
+}
+
+/*-----------------------------------------------------------------------------
+ * main... */
+//-----------------------------------------------------------------------------
+int main (int argc, char *argv[]) {
+
+    char *endptr;
+    int sockfd;
+    int max_threads;
+
+    if (argc != 3)
+        usage ();
+
+    endptr = NULL;
+    max_threads = strtol (argv[1], &endptr, 10);
+    if (max_threads < 1 || (endptr && *endptr != '\0')) {
+        puts ("error: 'nclients' must be an integer greater than 0");
+        usage ();
+    }
+
+    endptr = NULL;
+    if (strtol (argv[2], &endptr, 10) < 1 || (endptr && *endptr != '\0')) {
+        puts ("error: 'port' must be an integer greater than 0");
+        usage ();
+    }
+
+    // initialize shared variable
+    num_threads = 0;
+    pthread_mutex_init (&num_threads_lock, NULL);
+
+    ctable_init ();
+    sockfd = server_init (argv[2]);
+
+#ifdef DAEMON
+    daemonize ();
+#endif
+
+    server_main (sockfd, max_threads);
 
     return 0;
 }
