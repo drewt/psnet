@@ -208,16 +208,16 @@ int main (int argc, char *argv[]) {
         usage ();
     }
 
+#ifdef DAEMON
+    daemonize ();
+#endif
+
     // initialize shared variable
     num_threads = 0;
     pthread_mutex_init (&num_threads_lock, NULL);
 
     ctable_init ();
     sockfd = server_init (argv[2]);
-
-#ifdef DAEMON
-    daemonize ();
-#endif
 
     server_main (sockfd, max_threads);
 
