@@ -159,6 +159,9 @@ void *handle_request (void *data) {
                 response.str = strdup (bad);
             } else {
                 response.len = strlen (response.str) + 1;
+#ifdef P2PSERV_LOG
+                printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, info->addr, port);
+#endif
             }
         } else if (cmd_equal (cmd, "EXIT", 4)) {
             response.str = strdup (good);

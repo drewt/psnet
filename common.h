@@ -7,13 +7,15 @@
 #include <pthread.h>
 
 #ifdef DAEMON
-#define ANSI_GREEN ""
-#define ANSI_RED   ""
-#define ANSI_RESET ""
+#define ANSI_YELLOW ""
+#define ANSI_GREEN  ""
+#define ANSI_RED    ""
+#define ANSI_RESET  ""
 #else
-#define ANSI_GREEN "\x1b[32m"
-#define ANSI_RED   "\x1b[31m"
-#define ANSI_RESET "\x1b[0m"
+#define ANSI_YELLOW "\x1b[33m"
+#define ANSI_GREEN  "\x1b[32m"
+#define ANSI_RED    "\x1b[31m"
+#define ANSI_RESET  "\x1b[0m"
 #endif
 
 struct conn_info {
