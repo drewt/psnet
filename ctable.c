@@ -7,6 +7,7 @@
 #include "ctable.h"
 
 static void ctable_tick ();
+static int ctable_remove_internal (const data_t *data);
 
 struct ct_node {
     const data_t *data;
@@ -45,8 +46,9 @@ static pthread_mutex_t ctable_lock;
  * Clock thread: periodically calls the ctable_tick() function  */
 //-----------------------------------------------------------------------------
 static void __attribute((noreturn)) *ctable_clock_thread () {
+    unsigned int left;
     for (;;) {
-        sleep (INTERVAL_SECONDS);
+        for (left = INTERVAL_SECONDS; left; left = sleep (left));
         ctable_tick ();
     }
 }
@@ -82,9 +84,7 @@ static void ctable_tick () {
         tmp_data = (data_t*) hash_table.delta_head->data;
         hash_table.delta_head = hash_table.delta_head->dl_next;
 
-        pthread_mutex_unlock (&ctable_lock);
-        ctable_remove (tmp_data);
-        pthread_mutex_lock (&ctable_lock);
+        ctable_remove_internal (tmp_data);
 
         hash_table.act (tmp_data);
     }
@@ -128,12 +128,11 @@ static void delta_insert (struct ct_node *node) {
 int ctable_insert (const data_t *data) {
     struct ct_node *node;
 
-    ctable_remove (data);
-
     node = malloc (sizeof (struct ct_node));
     node->data = data;
 
     pthread_mutex_lock (&ctable_lock);
+    ctable_remove_internal (data);
     hash_insert (node);
     delta_insert (node);
     pthread_mutex_unlock (&ctable_lock);
@@ -171,16 +170,12 @@ static struct ct_node *get_node (const data_t *data, struct ct_node **prev) {
  * Removes an element from the table.  Returns 0 on success, or -1 if the given
  * element is not in the table */
 //-----------------------------------------------------------------------------
-int ctable_remove (const data_t *data) {
+static int ctable_remove_internal (const data_t *data) {
     unsigned int index;
     struct ct_node *node, *prev;
 
-    pthread_mutex_lock (&ctable_lock);
-
-    if (!(node = get_node (data, &prev))) {
-        pthread_mutex_unlock (&ctable_lock);
+    if (!(node = get_node (data, &prev)))
         return -1;
-    }
 
     // remove from hash table
     if (prev) {
@@ -205,8 +200,20 @@ int ctable_remove (const data_t *data) {
 
     free (node);
 
-    pthread_mutex_unlock (&ctable_lock);
     return 0;
+}
+
+/*-----------------------------------------------------------------------------
+ * Thread-safe interface to ctable_remove_internal() */
+//-----------------------------------------------------------------------------
+int ctable_remove (const data_t *data) {
+    int rc;
+
+    pthread_mutex_lock (&ctable_lock);
+    rc = ctable_remove_internal (data);
+    pthread_mutex_unlock (&ctable_lock);
+
+    return rc;
 }
 
 /*-----------------------------------------------------------------------------
