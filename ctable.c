@@ -26,7 +26,8 @@ static struct {
     /* functions that operate on data_t */
     unsigned int (* const hash)(const data_t*);
     bool (* const equals)(const data_t*,const data_t*);
-    void (* const act)(data_t*);
+    void (* const act)(const data_t*);
+    void (* const free)(data_t*);
 
     struct ct_node *table[HT_SIZE]; // memory for the hash table
 } hash_table = {
@@ -35,7 +36,8 @@ static struct {
     .delta_tail = NULL,
     .hash = ctable_hash,
     .equals = ctable_equals,
-    .act = ctable_act
+    .act = ctable_act,
+    .free = ctable_free
 };
 
 /* XXX: global mutex to protect data structure;
@@ -84,9 +86,9 @@ static void ctable_tick () {
         tmp_data = (data_t*) hash_table.delta_head->data;
         hash_table.delta_head = hash_table.delta_head->dl_next;
 
-        ctable_remove_internal (tmp_data);
-
         hash_table.act (tmp_data);
+
+        ctable_remove_internal (tmp_data);
     }
     pthread_mutex_unlock (&ctable_lock);
 }
@@ -198,6 +200,7 @@ static int ctable_remove_internal (const data_t *data) {
     else
         hash_table.delta_head = node->dl_next;
 
+    hash_table.free ((data_t*)node->data);
     free (node);
 
     return 0;

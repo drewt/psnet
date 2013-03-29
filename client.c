@@ -32,13 +32,16 @@ bool ctable_equals (const struct client *a, const struct client *b) {
     return a->ip == b->ip && a->port == b->port;
 }
 
-void ctable_act (struct client *client) {
+void ctable_act (const struct client *client) {
 #ifdef P2PSERV_LOG
     char addr[20];
     inet_ntop (AF_INET, &client->ip, addr, 20);
     printf (ANSI_RED "X %s %d\n" ANSI_RESET, addr, client->port);
     fflush (stdout);
 #endif
+}
+
+void ctable_free (struct client *client) {
     free (client);
 }
 

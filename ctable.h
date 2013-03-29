@@ -30,6 +30,7 @@ void ctable_foreach (int (*fun)(const data_t *it, void *arg), void *arg);
 /* to be defined in another module */
 extern unsigned int ctable_hash (const data_t*);
 extern bool ctable_equals (const data_t*,const data_t*);
-extern void ctable_act (data_t*);
+extern void ctable_act (const data_t*);
+extern void ctable_free (data_t*);
 
 #endif
