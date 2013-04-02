@@ -84,7 +84,6 @@ static void ctable_tick () {
     // remove any expired elements
     while (hash_table.delta_head && !hash_table.delta_head->delta) {
         tmp_data = (data_t*) hash_table.delta_head->data;
-        hash_table.delta_head = hash_table.delta_head->dl_next;
 
         hash_table.act (tmp_data);
 
@@ -112,6 +111,7 @@ static void delta_insert (struct ct_node *node) {
 
     if (!hash_table.delta_head) {
         hash_table.delta_head = hash_table.delta_tail = node;
+        node->dl_prev = NULL;
     } else {
         node->delta -= hash_table.delta;
 

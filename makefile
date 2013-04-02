@@ -1,6 +1,6 @@
 CC      = gcc
-DEFINES = -DEXP_INTERVAL=10 -DINTERVAL_SECONDS=1 -DP2PSERV_LOG -DDAEMON
-CFLAGS  = -Wall -Wextra -Werror -std=gnu99 -pthread $(DEFINES)
+DEFINES = -DEXP_INTERVAL=10 -DINTERVAL_SECONDS=1 -DP2PSERV_LOG
+CFLAGS  = -Wall -Wextra -Werror -std=gnu99 -g -pthread $(DEFINES)
 
 OFILES = server.o service.o client.o ctable.o cJSON.o
 
