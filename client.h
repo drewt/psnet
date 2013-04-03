@@ -10,6 +10,7 @@ enum client_rc {
 
 int add_client (const char *ip, const char *port);
 int remove_client (const char *ip, const char *name);
-int clients_to_json (char **dest, const char *ip, const char *port);
+int clients_to_json (struct response_node **dest, const char *ip,
+        const char *port);
 
 #endif

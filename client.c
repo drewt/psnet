@@ -7,7 +7,6 @@
 #include "common.h"
 #include "client.h"
 #include "ctable.h"
-#include "cJSON.h"
 
 #define PORT_MIN 1024
 #define PORT_MAX 65535
@@ -106,46 +105,66 @@ int print_client (const struct client *client, void *data) {
     return 0;
 }
 
-struct foreach_arg {
-    cJSON *client_list;
+/* argument to the make_list() function */
+struct make_list_arg {
+    struct response_node *prev;
     struct client ignore;
 };
 
-static int add_client_to_array (const struct client *client, void *data) {
+/*-----------------------------------------------------------------------------
+ * Constructs a JSON representation of the given client structure and inserts
+ * it into the list given in the argument */
+//-----------------------------------------------------------------------------
+static int make_list (const struct client *client, void *data) {
 
-    struct foreach_arg *arg = data;
+    struct make_list_arg *arg = data;
     if (ctable_equals (&arg->ignore, client))
         return 0;
 
-    cJSON *elm  = cJSON_CreateObject ();
-
-    // convert IP address to string in dotted decimal
     char addr[20];
     inet_ntop (AF_INET, &client->ip, addr, 20);
 
-    cJSON_AddItemToArray (arg->client_list, elm);
-    cJSON_AddStringToObject (elm, "ip",   addr);
-    cJSON_AddNumberToObject (elm, "port", client->port);
+    struct response_node *node = malloc (sizeof (struct response_node));
+
+    node->data = malloc (38);
+    node->size = snprintf (node->data, 100, "{\"ip\":\"%s\",\"port\":%d},",
+            addr, client->port);
+    node->next = NULL;
+
+    arg->prev->next = node;
+    arg->prev = node;
+
     return 0;
 }
 
 /*-----------------------------------------------------------------------------
- * Returns a JSON representation of the clients currently connected to the
- * network */
+ * Constructs a JSON array from the server's list of clients, excluding the
+ * client given by the supplied IP address and port number */
 //-----------------------------------------------------------------------------
-int clients_to_json (char **dest, const char *ip, const char *port) {
-
+int clients_to_json (struct response_node **dest, const char *ip,
+        const char *port) {
     int rc;
-    struct foreach_arg arg;
-
+    struct make_list_arg arg;
+    struct response_node *head;
+    
     if ((rc = make_client (&arg.ignore, ip, port)))
         return rc;
 
-    arg.client_list = cJSON_CreateArray ();
+    arg.prev = malloc (sizeof (struct response_node));
+    arg.prev->data = strdup ("[");
+    arg.prev->size = 1;
+    arg.prev->next = NULL;
+    head = arg.prev;
 
-    ctable_foreach (add_client_to_array, &arg);
-    *dest = cJSON_PrintUnformatted (arg.client_list);
-    cJSON_Delete (arg.client_list);
+    ctable_foreach (make_list, &arg);
 
+    if (arg.prev != head)
+        arg.prev->size--; // ignore trailing comma
+    arg.prev->next = malloc (sizeof (struct response_node));
+    arg.prev->next->data = strdup ("]\r\n");
+    arg.prev->next->size = 3;
+    arg.prev->next->next = NULL;
+
+    *dest = head;
     return CL_OK;
 }
