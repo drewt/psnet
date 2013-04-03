@@ -134,8 +134,13 @@ static void make_response (struct response_node *head,
     // fill out header node
     hdr = malloc (sizeof (struct response_node));
     hdr->data = malloc (100);
+#ifdef LISP_OUTPUT
+    hdr->size = snprintf (hdr->data, 100,
+            "(:status \"okay\" :size %lu)\r\n\r\n", rest_len);
+#else
     hdr->size = snprintf (hdr->data, 100,
             "{\"status\":\"okay\",\"size\":%lu}\r\n\r\n", rest_len);
+#endif
     hdr->next = rest;
 
     head->next = hdr;
@@ -156,11 +161,19 @@ static void free_response (struct response_node *node) {
 }
 
 static inline void response_bad (struct response_node *prev) {
+#ifdef LISP_OUTPUT
+    make_simple_response (prev, "(:status \"error\")\r\n\r\n", 21);
+#else
     make_simple_response (prev, "{\"status\":\"error\"}\r\n\r\n", 22);
+#endif
 }
 
 static inline void response_ok (struct response_node *prev) {
+#ifdef LISP_OUTPUT
+    make_simple_response (prev, "(:status \"okay\")\r\n\r\n", 20);
+#else
     make_simple_response (prev, "{\"status\":\"okay\"}\r\n\r\n", 21);
+#endif
 }
 
 /*-----------------------------------------------------------------------------
@@ -236,13 +249,13 @@ void *handle_request (void *data) {
         free_response (response_head.next);
     }
 
-#ifdef P2PSERV_LOG
-    printf ("D %s\n", info->addr); fflush (stdout);
-#endif
     close (info->sock);
-    free (info);
     pthread_mutex_lock (&num_threads_lock);
     num_threads--;
     pthread_mutex_unlock (&num_threads_lock);
+#ifdef P2PSERV_LOG
+    printf ("D %s\n", info->addr); fflush (stdout);
+#endif
+    free (info);
     pthread_exit (NULL);
 }

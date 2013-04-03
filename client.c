@@ -127,8 +127,13 @@ static int make_list (const struct client *client, void *data) {
     struct response_node *node = malloc (sizeof (struct response_node));
 
     node->data = malloc (38);
+#ifdef LISP_OUTPUT
+    node->size = snprintf (node->data, 100, "(:ip \"%s\" :port %d) ",
+            addr, client->port);
+#else
     node->size = snprintf (node->data, 100, "{\"ip\":\"%s\",\"port\":%d},",
             addr, client->port);
+#endif
     node->next = NULL;
 
     arg->prev->next = node;
@@ -151,7 +156,11 @@ int clients_to_json (struct response_node **dest, const char *ip,
         return rc;
 
     arg.prev = malloc (sizeof (struct response_node));
+#ifdef LISP_OUTPUT
+    arg.prev->data = strdup ("(");
+#else
     arg.prev->data = strdup ("[");
+#endif
     arg.prev->size = 1;
     arg.prev->next = NULL;
     head = arg.prev;
@@ -159,9 +168,13 @@ int clients_to_json (struct response_node **dest, const char *ip,
     ctable_foreach (make_list, &arg);
 
     if (arg.prev != head)
-        arg.prev->size--; // ignore trailing comma
+        arg.prev->size--; // ignore trailing separator
     arg.prev->next = malloc (sizeof (struct response_node));
+#ifdef LISP_OUTPUT
+    arg.prev->next->data = strdup (")\r\n");
+#else
     arg.prev->next->data = strdup ("]\r\n");
+#endif
     arg.prev->next->size = 3;
     arg.prev->next->next = NULL;
 
