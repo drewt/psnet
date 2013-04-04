@@ -109,6 +109,8 @@ int print_client (const struct client *client, void *data) {
 struct make_list_arg {
     struct response_node *prev;
     struct client ignore;
+    int i;
+    int n;
 };
 
 /*-----------------------------------------------------------------------------
@@ -118,6 +120,10 @@ struct make_list_arg {
 static int make_list (const struct client *client, void *data) {
 
     struct make_list_arg *arg = data;
+    if (arg->i > arg->n)
+        return 1;
+    arg->i++;
+
     if (ctable_equals (&arg->ignore, client))
         return 0;
 
@@ -147,14 +153,21 @@ static int make_list (const struct client *client, void *data) {
  * client given by the supplied IP address and port number */
 //-----------------------------------------------------------------------------
 int clients_to_json (struct response_node **dest, const char *ip,
-        const char *port) {
-    int rc;
+        const char *port, const char *n) {
+    int rc, num;
+    char *endptr;
     struct make_list_arg arg;
     struct response_node *head;
-    
+
+    num = strtol (n, &endptr, 10);
+    if (num < 0 || *endptr != '\0')
+        return CL_BADNUM;
+
     if ((rc = make_client (&arg.ignore, ip, port)))
         return rc;
 
+    arg.i = 0;
+    arg.n = num;
     arg.prev = malloc (sizeof (struct response_node));
 #ifdef LISP_OUTPUT
     arg.prev->data = strdup ("(");

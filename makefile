@@ -1,6 +1,6 @@
 CC      = gcc
-DEFINES = -DEXP_INTERVAL=10 -DINTERVAL_SECONDS=1 -DP2PSERV_LOG -DLISP_OUTPUT
-CFLAGS  = -Wall -Wextra -Werror -std=gnu99 -g -pthread $(DEFINES)
+DEFINES = -DEXP_INTERVAL=10 -DINTERVAL_SECONDS=1 
+CFLAGS  = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g -pthread $(DEFINES)
 
 OFILES = server.o service.o client.o ctable.o
 
