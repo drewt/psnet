@@ -7,7 +7,7 @@ OFILES = server.o service.o client.o ctable.o
 all: server
 
 server: $(OFILES)
-	$(CC) $(CFLAGS) $(OFILES) -o server -lm
+	$(CC) $(CFLAGS) $(OFILES) -o server
 
 ctable_test: ctable_test.o ctable.o
 	$(CC) $(CFLAGS) ctable_test.o ctable.o -o test

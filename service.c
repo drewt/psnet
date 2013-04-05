@@ -230,7 +230,7 @@ void *handle_request (void *data) {
         } else if (cmd_equal (cmd, "LIST", 4)) {
             struct response_node *jlist;
             char *n = strtok_r (NULL, " \r\n", &p);
-            if (!port || clients_to_json (&jlist, info->addr, port, n)) {
+            if (!port || clients_to_json (&jlist, n)) {
                 response_bad (&response_head);
             } else {
                 make_response (&response_head, jlist);

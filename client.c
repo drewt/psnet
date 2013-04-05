@@ -108,7 +108,6 @@ int print_client (const struct client *client, void *data) {
 /* argument to the make_list() function */
 struct make_list_arg {
     struct response_node *prev;
-    struct client ignore;
     int i;
     int n;
 };
@@ -123,9 +122,6 @@ static int make_list (const struct client *client, void *data) {
     if (arg->i > arg->n)
         return 1;
     arg->i++;
-
-    if (ctable_equals (&arg->ignore, client))
-        return 0;
 
     char addr[20];
     inet_ntop (AF_INET, &client->ip, addr, 20);
@@ -152,9 +148,8 @@ static int make_list (const struct client *client, void *data) {
  * Constructs a JSON array from the server's list of clients, excluding the
  * client given by the supplied IP address and port number */
 //-----------------------------------------------------------------------------
-int clients_to_json (struct response_node **dest, const char *ip,
-        const char *port, const char *n) {
-    int rc, num;
+int clients_to_json (struct response_node **dest, const char *n) {
+    int num;
     char *endptr;
     struct make_list_arg arg;
     struct response_node *head;
@@ -162,9 +157,6 @@ int clients_to_json (struct response_node **dest, const char *ip,
     num = strtol (n, &endptr, 10);
     if (num < 0 || *endptr != '\0')
         return CL_BADNUM;
-
-    if ((rc = make_client (&arg.ignore, ip, port)))
-        return rc;
 
     arg.i = 0;
     arg.n = num;
