@@ -180,6 +180,8 @@ static void __attribute((noreturn)) server_main (int sockfd, int max_threads) {
         // create a new thread to service the connection
         if (pthread_create (&tid, NULL, handle_request, targ))
             perror ("pthread_create");
+        if (pthread_detach (tid))
+            perror ("pthread_detach");
     }
 }
 

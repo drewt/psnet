@@ -87,7 +87,6 @@ static int send_msg (int sock, char *buf, size_t len) {
     ssize_t rc;
     size_t sent = 0;
 
-    printf ("%.*s", (int)len, buf);
     while (sent != len) {
         if ((rc = send (sock, buf + sent, len - sent, 0)) == -1)
             return -1;
