@@ -2,7 +2,7 @@ CC      = gcc
 DEFINES = -DEXP_INTERVAL=10 -DINTERVAL_SECONDS=1 -DP2PSERV_LOG
 CFLAGS  = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g -pthread $(DEFINES)
 
-OFILES = server.o response.o client.o ctable.o
+OFILES = server.o request.o response.o client.o ctable.o
 DIROFILES = dirservice.o
 NODEOFILES = nodeservice.o
 
@@ -18,6 +18,7 @@ ctable_test: ctable_test.o ctable.o
 	$(CC) $(CFLAGS) ctable_test.o ctable.o -o test
 
 $(OFILES): common.h
+request.o: request.h
 response.o: response.h
 ctable.o: ctable.h
 client.o: client.h ctable.h response.h
