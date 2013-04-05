@@ -6,6 +6,7 @@
 
 #include "common.h"
 #include "client.h"
+#include "response.h"
 #include "ctable.h"
 
 #define PORT_MIN 1024
@@ -119,7 +120,7 @@ struct make_list_arg {
 static int make_list (const struct client *client, void *data) {
 
     struct make_list_arg *arg = data;
-    if (arg->i > arg->n)
+    if (arg->i >= arg->n)
         return 1;
     arg->i++;
 

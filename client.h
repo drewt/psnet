@@ -1,6 +1,8 @@
 #ifndef _CLIENT_H_
 #define _CLIENT_H_
 
+#include "response.h"
+
 enum client_rc {
     CL_OK,
     CL_BADIP,
