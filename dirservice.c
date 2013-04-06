@@ -19,32 +19,11 @@
 #include "response.h"
 #include "client.h"
 
-static inline bool cmd_equal (const char *str, const char *cmd, size_t len) {
-    return !strncmp (str, cmd, len) && str[len] == '\0';
-}
-
-static inline void response_bad (struct response_node *prev) {
-#ifdef LISP_OUTPUT
-    make_simple_response (prev, "(:status \"error\")\r\n\r\n", 21);
-#else
-    make_simple_response (prev, "{\"status\":\"error\"}\r\n\r\n", 22);
-#endif
-}
-
-static inline void response_ok (struct response_node *prev) {
-#ifdef LISP_OUTPUT
-    make_simple_response (prev, "(:status \"okay\")\r\n\r\n", 20);
-#else
-    make_simple_response (prev, "{\"status\":\"okay\"}\r\n\r\n", 21);
-#endif
-}
-
 /*-----------------------------------------------------------------------------
  * Handles requests from the client */
 //-----------------------------------------------------------------------------
 void *handle_request (void *data) {
 
-    bool done;
     struct conn_info *info;
 
     char msg_buf[REQ_MAX];
@@ -53,12 +32,11 @@ void *handle_request (void *data) {
     struct response_node response_head;
 
     info = data;
-    done = false;
 
-    while (!done) {
+    for(;;) {
 
         // go to cleanup if connection was closed
-        if (!read_request (info->sock, msg_buf))
+        if (!read_message (info->sock, msg_buf))
             break;
 
         // parse message
@@ -101,8 +79,7 @@ void *handle_request (void *data) {
 #endif
             }
         } else if (cmd_equal (cmd, "EXIT", 4)) {
-            response_ok (&response_head);
-            done = true;
+            break;
         } else {
             response_bad (&response_head);
         }

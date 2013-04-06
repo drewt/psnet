@@ -38,7 +38,7 @@ static signed char recv_char (int sock, struct recv_buf *buf) {
  * the maximum message size (MSG_MAX) is reached.  Returns the message size on
  * a successful read, or 0 if the client closed the connection */
 //-----------------------------------------------------------------------------
-size_t read_request (int sock, char *msg_buf) {
+size_t read_message (int sock, char *msg_buf) {
     size_t i, delim_pos;
     struct recv_buf recv_buf = { .pos = 0, .len = 0 };
 

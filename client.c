@@ -9,30 +9,18 @@
 #include "response.h"
 #include "ctable.h"
 
-#define PORT_MIN 1024
+#define PORT_MIN 0
 #define PORT_MAX 65535
 
-/* Client structure: a network node.
- *
- *   Client is an opaque type; it is not used whatsoever in the networking
- * code, and its definition is unavailable to the back-end code.  This module
- * provides the glue between the two.
- *
- */
-struct client {
-    in_addr_t ip;   // XXX: IPv4 only
-    in_port_t port;
-};
-
-unsigned int ctable_hash (const struct client *client) {
+unsigned int ctable_hash (const struct net_node *client) {
     return client->ip + client->port;
 }
 
-bool ctable_equals (const struct client *a, const struct client *b) {
+bool ctable_equals (const struct net_node *a, const struct net_node *b) {
     return a->ip == b->ip && a->port == b->port;
 }
 
-void ctable_act (const struct client *client) {
+void ctable_act (const struct net_node *client) {
 #ifdef P2PSERV_LOG
     char addr[20];
     inet_ntop (AF_INET, &client->ip, addr, 20);
@@ -41,7 +29,7 @@ void ctable_act (const struct client *client) {
 #endif
 }
 
-void ctable_free (struct client *client) {
+void ctable_free (struct net_node *client) {
     free (client);
 }
 
@@ -49,7 +37,7 @@ void ctable_free (struct client *client) {
  * Fills out a client structure with the given ip and port number, ensuring
  * that the arguments are valid */
 //-----------------------------------------------------------------------------
-static int make_client (struct client *client, const char *ip,
+static int make_client (struct net_node *client, const char *ip,
         const char *port) {
     struct in_addr addr;
     char *endptr;
@@ -62,7 +50,7 @@ static int make_client (struct client *client, const char *ip,
     if (lport < PORT_MIN || lport > PORT_MAX || *endptr != '\0')
         return CL_BADPORT;
 
-    *client = (struct client)
+    *client = (struct net_node)
         { .ip = addr.s_addr, .port = (in_port_t) lport };
 
     return CL_OK;
@@ -72,10 +60,10 @@ static int make_client (struct client *client, const char *ip,
  * Adds a client to the network */
 //-----------------------------------------------------------------------------
 int add_client (const char *ip, const char *port) {
-    struct client *client;
+    struct net_node *client;
     int rc;
 
-    client = malloc (sizeof (struct client));
+    client = malloc (sizeof (struct net_node));
     if ((rc = make_client (client, ip, port)))
         return rc;
 
@@ -88,7 +76,7 @@ int add_client (const char *ip, const char *port) {
  * Removes a client from the network */
 //-----------------------------------------------------------------------------
 int remove_client (const char *ip, const char *port) {
-    struct client client;
+    struct net_node client;
     int rc;
 
     if ((rc = make_client (&client, ip, port)))
@@ -100,7 +88,7 @@ int remove_client (const char *ip, const char *port) {
     return CL_OK;
 }
 
-int print_client (const struct client *client, void *data) {
+int print_client (const struct net_node *client, void *data) {
     FILE *stream = data;
     fprintf (stream, "{ %d, %d }\n", client->ip, client->port);
     return 0;
@@ -117,7 +105,7 @@ struct make_list_arg {
  * Constructs a JSON representation of the given client structure and inserts
  * it into the list given in the argument */
 //-----------------------------------------------------------------------------
-static int make_list (const struct client *client, void *data) {
+static int make_list (const struct net_node *client, void *data) {
 
     struct make_list_arg *arg = data;
     if (arg->i >= arg->n)

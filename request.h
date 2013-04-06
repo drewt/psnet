@@ -3,6 +3,6 @@
 
 #define REQ_MAX 100
 
-size_t read_request (int sock, char *msg_buf);
+size_t read_message (int sock, char *msg_buf);
 
 #endif

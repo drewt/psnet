@@ -23,6 +23,11 @@ struct conn_info {
     char addr[INET6_ADDRSTRLEN];
 };
 
+struct net_node {
+    in_addr_t ip;   // XXX: IPv4 only
+    in_port_t port;
+};
+
 void *handle_request (void *data);
 
 extern int num_threads;
