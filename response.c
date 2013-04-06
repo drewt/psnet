@@ -13,8 +13,10 @@ static int send_msg (int sock, char *buf, size_t len) {
     size_t sent = 0;
 
     while (sent != len) {
-        if ((rc = send (sock, buf + sent, len - sent, 0)) == -1)
+        if ((rc = send (sock, buf + sent, len - sent, 0)) == -1) {
+            perror ("send");
             return -1;
+        }
         sent += rc;
     }
     return 0;
@@ -25,8 +27,10 @@ static int send_msg (int sock, char *buf, size_t len) {
 //-----------------------------------------------------------------------------
 int send_response (int sock, struct response_node *node) {
     while (node) {
-        if (send_msg (sock, node->data, node->size) == -1)
+        if (send_msg (sock, node->data, node->size) == -1) {
+            fprintf (stderr, "send_msg: failed to send\n");
             return -1;
+        }
         node = node->next;
     }
     return 0;
