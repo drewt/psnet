@@ -61,8 +61,10 @@ static void __attribute((noreturn)) *ctable_clock_thread () {
 void ctable_init (void) {
     pthread_t tid;
 
-    pthread_mutex_init (&ctable_lock, NULL);
-    pthread_create (&tid, NULL, ctable_clock_thread, NULL);
+    if (pthread_mutex_init (&ctable_lock, NULL))
+        perror ("pthread_mutex_init");
+    if (pthread_create (&tid, NULL, ctable_clock_thread, NULL))
+        perror ("pthread_create");
 }
 
 /*-----------------------------------------------------------------------------
@@ -127,7 +129,7 @@ static void delta_insert (struct ct_node *node) {
 /*-----------------------------------------------------------------------------
  * Inserts an element into the table */
 //-----------------------------------------------------------------------------
-int ctable_insert (const data_t *data) {
+void ctable_insert (const data_t *data) {
     struct ct_node *node;
 
     node = malloc (sizeof (struct ct_node));
@@ -138,8 +140,6 @@ int ctable_insert (const data_t *data) {
     hash_insert (node);
     delta_insert (node);
     pthread_mutex_unlock (&ctable_lock);
-
-    return 0;
 }
 
 /*-----------------------------------------------------------------------------

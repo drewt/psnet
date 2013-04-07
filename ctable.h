@@ -20,7 +20,7 @@ typedef struct net_node data_t;
 
 /* defined in ctable.c */
 void ctable_init (void);
-int ctable_insert (const data_t *data);
+void ctable_insert (const data_t *data);
 int ctable_remove (const data_t *data);
 bool ctable_contains (const data_t *data);
 const data_t *ctable_get (const data_t *data);
