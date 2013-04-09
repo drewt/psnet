@@ -43,9 +43,10 @@ static void __attribute((noreturn)) *router_update_thread (void *data)
 static void __attribute((noreturn)) *router_keepalive_thread (void *data)
 {
     int status;
+    char *port = data;
 
     for(;;) {
-        if (dir_send_connect (DIR_ADDR, DIR_PORT, &status) == -1)
+        if (dir_send_connect (DIR_ADDR, DIR_PORT, port, &status) == -1)
             fprintf (stderr, "send_connect: failed to update directory\n");
         else if (status != STATUS_OKAY)
             fprintf (stderr, "send_connect: directory returned error %d\n",
@@ -54,14 +55,14 @@ static void __attribute((noreturn)) *router_keepalive_thread (void *data)
     }
 }
 
-void router_init (void)
+void router_init (char *listen_port)
 {
     pthread_t tid;
 
     pthread_mutex_init (&routers_lock, NULL);
     if (pthread_create (&tid, NULL, router_update_thread, NULL))
         perror ("pthread_create");
-    if (pthread_create (&tid, NULL, router_keepalive_thread, NULL))
+    if (pthread_create (&tid, NULL, router_keepalive_thread, listen_port))
         perror ("pthread_create");
 }
 

@@ -79,7 +79,7 @@ int tcp_server_init (char *port)
     hints.ai_flags    = AI_PASSIVE;
 
     if ((rc = getaddrinfo (NULL, port, &hints, &servinfo))) {
-        fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (rc));
+        fprintf (stderr, "tcpserver: getaddrinfo: %s\n", gai_strerror (rc));
         exit (EXIT_FAILURE);
     }
 
@@ -87,19 +87,19 @@ int tcp_server_init (char *port)
     for (p = servinfo; p; p = p->ai_next) {
         if ((sockfd = socket (p->ai_family, p->ai_socktype,
                         p->ai_protocol)) == -1) {
-            perror ("server: socket");
+            perror ("tcpserver: socket");
             continue;
         }
 
         if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
                     sizeof (int)) == -1) {
-            perror ("setsockopt");
+            perror ("tcpserver: setsockopt");
             exit (EXIT_FAILURE);
         }
 
         if (bind (sockfd, p->ai_addr, p->ai_addrlen) == -1) {
             close (sockfd);
-            perror ("server: bind");
+            perror ("tcpserver: bind");
             continue;
         }
 
@@ -107,14 +107,14 @@ int tcp_server_init (char *port)
     }
 
     if (!p) {
-        fprintf (stderr, "server: failed to bind\n");
+        fprintf (stderr, "tcpserver: failed to bind\n");
         exit (EXIT_FAILURE);
     }
 
     freeaddrinfo (servinfo);
 
     if (listen (sockfd, BACKLOG) == -1) {
-        perror ("listen");
+        perror ("tcpserver: listen");
         exit (EXIT_FAILURE);
     }
 

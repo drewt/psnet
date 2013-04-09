@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <pthread.h>
 
 #include "common.h"
@@ -16,22 +17,73 @@
 
 #define MAX_HOPS 4
 
-/*static int udp_send_msg (const char *msg, size_t msg_len,
-        struct sockaddr_storage *dst)
+#define PONG_MAX (25 + PORT_STRLEN)
+
+static char *udp_listen_port;
+
+static void udp_send_msg (const char *msg, size_t len, struct sockaddr *dst)
 {
-    int s;
-    socklen_t ss_len;
+    struct addrinfo hints, *servinfo;
+    char paddr[INET6_ADDRSTRLEN];
+    char pport[PORT_STRLEN+1];
+    int s, rc;
+
+    // TODO: find out why manually packed sockaddr doesn't work
+    inet_ntop (dst->sa_family, get_in_addr (dst), paddr, sizeof (*dst));
+    snprintf (pport, PORT_STRLEN+1, "%d", get_in_port (dst));
 
     if ((s = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         perror ("socket");
         return;
     }
 
-    ss_len = sizeof (*dst);
-    if (sendto (s, msg, msg_len, 0, (struct sockaddr*) dst, ss_len) == -1)
-        perror ("sendto");
-}*/
+    memset (&hints, 0, sizeof (hints));
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_protocol = IPPROTO_UDP;
+    hints.ai_flags    = AI_PASSIVE;
 
+    if ((rc = getaddrinfo (paddr, pport, &hints, &servinfo))) {
+        fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (rc));
+        exit (EXIT_FAILURE);
+    }
+
+    if (sendto (s, msg, len, 0, servinfo->ai_addr, servinfo->ai_addrlen) == -1)
+        perror ("sendto");
+
+    freeaddrinfo (servinfo);
+}
+
+static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
+{
+    int rv;
+    int port;
+    long lport;
+    char pong[PONG_MAX];
+
+    if ((port = jsmn_get_value (mi->msg, tok, "port")) == -1)
+        return;
+
+    lport = strtol (mi->msg + tok[port].start, NULL, 10);
+    if (lport < PORT_MIN || lport > PORT_MAX)
+        return;
+
+    set_in_port ((struct sockaddr*)&mi->addr, (in_port_t) lport);
+
+#ifdef P2PSERV_LOG
+    printf (ANSI_YELLOW "P %s %d\n" ANSI_RESET, mi->paddr,
+            get_in_port ((struct sockaddr*)&mi->addr));
+#endif
+
+    rv = snprintf (pong, PONG_MAX, "{\"method\":\"pong\",\"port\":%s}",
+            udp_listen_port);
+
+    udp_send_msg (pong, rv, (struct sockaddr*) &mi->addr);
+}
+
+/*-----------------------------------------------------------------------------
+ * Processes a keep-alive message */
+//-----------------------------------------------------------------------------
 static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
     int port;
@@ -50,6 +102,11 @@ static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 
 }
 
+/*-----------------------------------------------------------------------------
+ * Processes a search query: increments the 'hops' field (discarding the
+ * message if it's reached the hop limit) and forwards the message to all known
+ * routers and clients */
+//-----------------------------------------------------------------------------
 static void process_search (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
     struct sockaddr_storage ss;
@@ -87,6 +144,9 @@ static void process_search (struct msg_info *mi, jsmntok_t *tok, int ntok)
             msg);
 }
 
+/*-----------------------------------------------------------------------------
+ * Handles a UDP message (callback for udp_server_main()) */
+//-----------------------------------------------------------------------------
 static void *handle_message (void *data)
 {
     struct msg_info *msg = data;
@@ -110,15 +170,25 @@ static void *handle_message (void *data)
         process_connect (msg, tok, p.toknext);
     else if (jsmn_tokeq (msg->msg, &tok[method], "search"))
         process_search (msg, tok, p.toknext);
+    else if (jsmn_tokeq (msg->msg, &tok[method], "ping"))
+        process_ping (msg, tok, p.toknext);
+    else
+        printf ("junk packet: %s\n", msg->msg);
 
 cleanup:
     pthread_mutex_lock (&udp_threads_lock);
     udp_threads--;
     pthread_mutex_unlock (&udp_threads_lock);
     free (msg);
+#ifdef P2PSERV_LOG
+    printf ("-M %s\n", msg->paddr);
+#endif
     pthread_exit (NULL);
 }
 
+/*-----------------------------------------------------------------------------
+ * Usage... */
+//-----------------------------------------------------------------------------
 static void __attribute((noreturn)) usage (void)
 {
     puts ("usage: infranode [nclients] [port]\n"
@@ -127,11 +197,15 @@ static void __attribute((noreturn)) usage (void)
     exit (EXIT_FAILURE);
 }
 
+/*-----------------------------------------------------------------------------
+ * Main... */
+//-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
     char *endptr;
     int sockfd;
     int max_threads;
+    long lport;
 
     if (argc != 3)
         usage ();
@@ -144,14 +218,16 @@ int main (int argc, char *argv[])
     }
 
     endptr = NULL;
-    if (strtol (argv[2], &endptr, 10) < 1 || (endptr && *endptr != '\0')) {
-        fprintf (stderr, "error: 'port' must be a positive integer\n");
+    lport = strtol (argv[2], &endptr, 10);
+    if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0')) {
+        fprintf (stderr, "error: invalid port\n");
         usage ();
     }
+    udp_listen_port = argv[2];
 
     ctable_init ();
-    router_init ();
-    sockfd = udp_server_init (argv[2]);
+    router_init (udp_listen_port);
 
+    sockfd = udp_server_init (argv[2]);
     udp_server_main (sockfd, max_threads, handle_message);
 }

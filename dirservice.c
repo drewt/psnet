@@ -22,6 +22,9 @@
 
 #define REQ_DELIM " \t\r\n"
 
+/*-----------------------------------------------------------------------------
+ * Send the standard OK ACK */
+//-----------------------------------------------------------------------------
 static void send_okay (int sock)
 {
     struct response_node head;
@@ -31,6 +34,9 @@ static void send_okay (int sock)
     free_response (head.next);
 }
 
+/*-----------------------------------------------------------------------------
+ * Send the standard error ACK */
+//-----------------------------------------------------------------------------
 static void send_error (int sock)
 {
     struct response_node head;
@@ -40,6 +46,9 @@ static void send_error (int sock)
     free_response (head.next);
 }
 
+/*-----------------------------------------------------------------------------
+ * Process a 'CONNECT [port]' command */
+//-----------------------------------------------------------------------------
 static void process_connect (struct conn_info *info, char *args)
 {
     char *port, *p;
@@ -55,6 +64,9 @@ static void process_connect (struct conn_info *info, char *args)
 #endif
 }
 
+/*-----------------------------------------------------------------------------
+ * Process a 'DISCONNECT [port]' command */
+//-----------------------------------------------------------------------------
 static void process_disconnect (struct conn_info *info, char *args)
 {
     char *port, *p;
@@ -70,6 +82,9 @@ static void process_disconnect (struct conn_info *info, char *args)
 #endif
 }
 
+/*-----------------------------------------------------------------------------
+ * Process a 'LIST [n]' command */
+//-----------------------------------------------------------------------------
 static void process_list (struct conn_info *info, char *args)
 {
     struct response_node head;
@@ -90,6 +105,9 @@ static void process_list (struct conn_info *info, char *args)
     free_response (head.next);
 }
 
+/*-----------------------------------------------------------------------------
+ * Process a 'DISCOVER [port] [n]' command */
+//-----------------------------------------------------------------------------
 static void process_discover (struct conn_info *info, char *args)
 {
     struct response_node response_head;
@@ -111,6 +129,9 @@ static void process_discover (struct conn_info *info, char *args)
     free_response (response_head.next);
 }
 
+/*-----------------------------------------------------------------------------
+ * Handles a TCP connection (callback for tcp_server_main()) */
+//-----------------------------------------------------------------------------
 static void *handle_connection (void *data)
 {
     struct conn_info *info = data;
@@ -158,6 +179,9 @@ static void *handle_connection (void *data)
     pthread_exit (NULL);
 }
 
+/*-----------------------------------------------------------------------------
+ * Usage... */
+//-----------------------------------------------------------------------------
 static void __attribute((noreturn)) usage (void)
 {
     puts ("usage: infradir [nclients] [port]\n"
@@ -166,6 +190,9 @@ static void __attribute((noreturn)) usage (void)
     exit (EXIT_FAILURE);
 }
 
+/*-----------------------------------------------------------------------------
+ * Main... */
+//-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
     char *endptr;

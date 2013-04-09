@@ -285,7 +285,12 @@ int dir_get_list (struct node_list *prev, char *host, char *port)
 /*-----------------------------------------------------------------------------
  * Sends a CONNECT command to the directory given by 'host' and 'port' */
 //-----------------------------------------------------------------------------
-int dir_send_connect (char *host, char *port, int *status)
+int dir_send_connect (char *host, char *host_port, char *listen_port,
+        int *status)
 {
-    return send_command (NULL, "CONNECT 1220\r\n\r\n", host, port, status);
+#define CONNECT_STRLEN (13 + PORT_STRLEN)
+    char s[CONNECT_STRLEN];
+    snprintf (s, CONNECT_STRLEN, "CONNECT %s\r\n\r\n", listen_port);
+#undef CONNECT_STRLEN
+    return send_command (NULL, s, host, host_port, status);
 }

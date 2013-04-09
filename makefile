@@ -32,4 +32,14 @@ dirclient.o: dirclient.h tcp.h jsmn.h
 jsmn.o: jsmn.h
 
 clean:
-	rm -f $(OFILES) $(DIROFILES) $(NODEOFILES) ctable_test.o $(XFILES) ctable_test
+	rm -f $(OFILES) $(DIROFILES) $(NODEOFILES) ctable_test.o $(XFILES) \
+	    ctable_test
+
+dirmem: infradir
+	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
+	    --num-callers=20 --track-fds=yes ./infradir 10000 6666
+
+nodemem: infranode
+	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
+	    --num-callers=20 --track-fds=yes ./infranode 10000 6666
+

@@ -24,6 +24,7 @@
 
 #define PORT_MIN 0
 #define PORT_MAX 65535
+#define PORT_STRLEN 5
 
 #ifdef DAEMON
 void daemonize (void);
