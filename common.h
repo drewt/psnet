@@ -30,12 +30,6 @@
 void daemonize (void);
 #endif
 
-/* linked list of sockaddr* structures */
-struct node_list {
-    struct sockaddr_storage addr;
-    struct node_list *next;
-};
-
 static inline void *get_in_addr (const struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET)

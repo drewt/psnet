@@ -1,7 +1,7 @@
 #ifndef _P2P_DIRCLIENT_H_
 #define _P2P_DIRCLIENT_H_
 
-#include "common.h"
+struct node_list;
 
 enum dir_status { STATUS_OKAY = 0, STATUS_ERROR = -1 };
 

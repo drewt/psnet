@@ -10,6 +10,7 @@
 
 #include "dirclient.h"
 #include "common.h"
+#include "nodelist.h"
 #include "tcp.h"
 #include "jsmn.h"
 
@@ -17,7 +18,7 @@
  * Parses a header from the directory, setting the values of 'status' and
  * 'size' to the values contained in the header */
 //-----------------------------------------------------------------------------
-int parse_header (int *status, size_t *size, char *msg)
+static int parse_header (int *status, size_t *size, char *msg)
 {
     char s[5];
     char *endptr;
@@ -60,112 +61,6 @@ int parse_header (int *status, size_t *size, char *msg)
     }
 
     return 0;
-}
-
-/*-----------------------------------------------------------------------------
- * Parses a node object given by the token 'node' (pointing into the message
- * 'msg') into prev->next */
-//-----------------------------------------------------------------------------
-int parse_node (struct node_list *prev, const char *msg, jsmntok_t *node)
-{
-    char s[INET6_ADDRSTRLEN];
-    struct sockaddr_storage ss;
-    int iip, iport, iipv;
-    int ipv;
-    char *endptr;
-    long lport;
-
-    // get indices
-    if ((iip = jsmn_get_value (msg, node, "ip")) == -1)
-        return -1;
-
-    if ((iport = jsmn_get_value (msg, node, "port")) == -1)
-        return -1;
-
-    if ((iipv = jsmn_get_value (msg, node, "ipv")) == -1)
-        return -1;
-
-    // check types
-    if (node[iip].type != JSMN_STRING)
-        return -1;
-
-    if (node[iport].type != JSMN_PRIMITIVE)
-        return -1;
-    if (msg[node[iport].start] < '0' || msg[node[iport].start] > '9')
-        return -1;
-
-    if (node[iipv].type != JSMN_PRIMITIVE)
-        return -1;
-    if (msg[node[iipv].start] < '4' || msg[node[iipv].start] > '6')
-        return -1;
-
-    // convert and set address
-    ipv = msg[node[iipv].start] - '0';
-    if (ipv != 4 && ipv != 6)
-        return -1;
-
-    strncpy (s, msg + node[iip].start, jsmn_toklen (&node[iip]));
-    s[jsmn_toklen (&node[iip])] = '\0';
-
-    memset (&ss, 0, sizeof ss);
-    ss.ss_family = ipv == 4 ? AF_INET : AF_INET6;
-    if (!inet_pton (ss.ss_family, s, get_in_addr ((struct sockaddr*)&ss)))
-        return -1;
-
-    // convert and set port
-    strncpy (s, msg + node[iport].start, jsmn_toklen (&node[iport]));
-    s[jsmn_toklen (&node[iport])] = '\0';
-
-    lport = strtol (s, &endptr, 10);
-    if (lport < PORT_MIN || lport > PORT_MAX || *endptr != '\0')
-        return -1;
-
-    set_in_port ((struct sockaddr*) &ss, (in_port_t) lport);
-
-    prev->next = malloc (sizeof (struct node_list));
-    prev->next->addr = ss;
-
-    return 0;
-}
-
-/*-----------------------------------------------------------------------------
- * Parses a node array of 'nentries' elements (given in 'msg') into
- * prev->next */
-//-----------------------------------------------------------------------------
-int parse_node_array (struct node_list *prev, char *msg, int nentries)
-{
-    const int max_tok = 1 + 10 * nentries; // multiplier of 7 should do...
-    jsmn_parser p;
-    jsmntok_t tok[max_tok];
-    int rc = 0, i, ntok, end;
-
-    // parse message
-    jsmn_init (&p);
-    rc = jsmn_parse (&p, msg, tok, max_tok);
-    if (rc != JSMN_SUCCESS || tok[0].type != JSMN_ARRAY) {
-        rc = -1;
-        goto cleanup;
-    }
-
-    ntok = tok[0].size + 1;
-    for (i = 1; i < ntok; prev = prev->next) {
-        if (tok[i].type != JSMN_OBJECT || tok[i].size < 6) {
-            rc = -1;
-            goto cleanup;
-        }
-        if (parse_node (prev, msg, &tok[i])) {
-            rc = -1;
-            goto cleanup;
-        }
-        // find next element
-        for (end = 1; end; i++, end--) {
-            end += tok[i].size;
-            ntok += tok[i].size;
-        }
-    }
-cleanup:
-    prev->next = NULL;
-    return rc;
 }
 
 /*-----------------------------------------------------------------------------
@@ -264,19 +159,17 @@ cleanup:
 int dir_discover (struct node_list *prev, char *host, char *host_port,
         char *listen_port, int n)
 {
+#define DISCOVER_STRLEN (20 + PORT_STRLEN)
     int status;
     char *list;
-
-#define DISCOVER_STRLEN (20 + PORT_STRLEN)
     char cmd[DISCOVER_STRLEN];
-    snprintf (cmd, DISCOVER_STRLEN, "DISCOVER %s %d\r\n\r\n", listen_port, n);
-#undef DISCOVER_STRLEN
 
+    snprintf (cmd, DISCOVER_STRLEN, "DISCOVER %s %d\r\n\r\n", listen_port, n);
     if (send_command (&list, cmd, host, host_port, &status) < 1) {
         fprintf (stderr, "get_list: failed to retrieve list from directory\n");
         return -1;
     }
-    if (parse_node_array (prev, list, 32)) {
+    if (parse_node_list (prev, list, 32)) {
         fprintf (stderr, "invalid router list from directory server\n");
         free (list);
         return -1;
@@ -284,6 +177,7 @@ int dir_discover (struct node_list *prev, char *host, char *host_port,
 
     free (list);
     return 0;
+#undef DISCOVER_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
@@ -292,19 +186,17 @@ int dir_discover (struct node_list *prev, char *host, char *host_port,
 //-----------------------------------------------------------------------------
 int dir_list (struct node_list *prev, char *host, char *port, int n)
 {
+#define LIST_STRLEN 15
     int status;
     char *list;
-
-#define LIST_STRLEN 15
     char cmd[LIST_STRLEN];
-    snprintf (cmd, LIST_STRLEN, "LIST %d\r\n\r\n", n);
-#undef LIST_STRLEN
 
+    snprintf (cmd, LIST_STRLEN, "LIST %d\r\n\r\n", n);
     if (send_command (&list, cmd, host, port, &status) < 1) {
         fprintf (stderr, "get_list: failed to retrieve list from directory\n");
         return -1;
     }
-    if (parse_node_array (prev, list, 32)) {
+    if (parse_node_list (prev, list, 32)) {
         fprintf (stderr, "invalid router list from directory server\n");
         free (list);
         return -1;
@@ -312,6 +204,7 @@ int dir_list (struct node_list *prev, char *host, char *port, int n)
 
     free (list);
     return 0;
+#undef LIST_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
@@ -322,6 +215,6 @@ int dir_connect (char *host, char *host_port, char *listen_port, int *status)
 #define CONNECT_STRLEN (13 + PORT_STRLEN)
     char s[CONNECT_STRLEN];
     snprintf (s, CONNECT_STRLEN, "CONNECT %s\r\n\r\n", listen_port);
-#undef CONNECT_STRLEN
     return send_command (NULL, s, host, host_port, status);
+#undef CONNECT_STRLEN
 }

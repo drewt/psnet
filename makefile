@@ -4,7 +4,7 @@ CFLAGS  = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g -pthread $(D
 
 OFILES = request.o response.o client.o ctable.o
 DIROFILES = dirservice.o tcpserver.o 
-NODEOFILES = nodeservice.o udpserver.o router.o dirclient.o jsmn.o
+NODEOFILES = nodeservice.o udpserver.o router.o dirclient.o nodelist.o jsmn.o
 
 XFILES = infradir infranode
 
@@ -29,6 +29,7 @@ client.o: client.h ctable.h response.h
 dirservice.o: tcp.h ctable.h response.h client.h
 nodeservice.o: udp.h ctable.h router.h client.h jsmn.h
 dirclient.o: dirclient.h tcp.h jsmn.h
+nodelist.o: nodelist.h jsmn.h
 jsmn.o: jsmn.h
 
 clean:

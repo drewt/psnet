@@ -8,6 +8,7 @@
 #include "common.h"
 #include "udp.h"
 #include "router.h"
+#include "nodelist.h"
 #include "dirclient.h"
 
 #define DIR_ADDR "127.0.0.1"
