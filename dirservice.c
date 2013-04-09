@@ -20,80 +20,133 @@
 #include "client.h"
 #include "ctable.h"
 
-/*-----------------------------------------------------------------------------
- * Handles requests from the client */
-//-----------------------------------------------------------------------------
+#define REQ_DELIM " \t\r\n"
+
+static void send_okay (int sock)
+{
+    struct response_node head;
+
+    response_ok (&head);
+    send_response (sock, head.next);
+    free_response (head.next);
+}
+
+static void send_error (int sock)
+{
+    struct response_node head;
+
+    response_bad (&head);
+    send_response (sock, head.next);
+    free_response (head.next);
+}
+
+static void process_connect (struct conn_info *info, char *args)
+{
+    char *port, *p;
+
+    port = strtok_r (args, REQ_DELIM, &p);
+    if (!port || add_client (&info->addr, port)) {
+        send_error (info->sock);
+        return;
+    }
+    send_okay (info->sock);
+#ifdef P2PSERV_LOG
+    printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->paddr, port);
+#endif
+}
+
+static void process_disconnect (struct conn_info *info, char *args)
+{
+    char *port, *p;
+
+    port = strtok_r (args, REQ_DELIM, &p);
+    if (!port || remove_client (&info->addr, port)) {
+        send_error (info->sock);
+        return;
+    }
+    send_okay (info->sock);
+#ifdef P2PSERV_LOG
+    printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->paddr, port);
+#endif
+}
+
+static void process_list (struct conn_info *info, char *args)
+{
+    struct response_node head;
+    struct response_node *jlist;
+    char *n, *p;
+    
+    n = strtok_r (args, REQ_DELIM, &p);
+    if (!n || clients_to_json (&jlist, n)) {
+        send_error (info->sock);
+        return;
+    }
+
+    make_response_with_body (&head, jlist);
+#ifdef P2PSERV_LOG
+    printf (ANSI_YELLOW "L %s\n" ANSI_RESET, info->paddr);
+#endif
+    send_response (info->sock, head.next);
+    free_response (head.next);
+}
+
+static void process_discover (struct conn_info *info, char *args)
+{
+    struct response_node response_head;
+    struct response_node *jlist;
+    char *port, *n, *p;
+    
+    n    = strtok_r (args, REQ_DELIM, &p);
+    port = strtok_r (NULL, REQ_DELIM, &p);
+    if (!n || !port || clients_to_json (&jlist, n)) {
+        send_error (info->sock);
+        return;
+    }
+
+    make_response_with_body (&response_head, jlist);
+#ifdef P2PSERV_LOG
+    printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, info->paddr, port);
+#endif
+    send_response (info->sock, response_head.next);
+    free_response (response_head.next);
+}
+
 static void *handle_connection (void *data)
 {
-    struct conn_info *info;
+    struct conn_info *info = data;
 
     char msg_buf[TCP_MSG_MAX];
-    char *cmd, *port, *p;
+    char *cmd, *args, *p;
     int rv;
-
-    struct response_node response_head;
-
-    info = data;
 
     for(;;) {
 
-        // go to cleanup if connection was closed
+        // read message from socket
         if (!(rv = tcp_read_message (info->sock, msg_buf)))
             break;
 
         // parse message
-        cmd  = strtok_r (msg_buf, " \r\n", &p);
-        port = strtok_r (NULL,    " \r\n", &p);
+        cmd  = strtok_r (msg_buf, REQ_DELIM, &p);
+        args = strtok_r (NULL, "", &p);
 
-        // construct response
-        response_head.next = NULL;
-        if (!cmd) {
-            response_bad (&response_head);
-        } else if (cmd_equal (cmd, "CONNECT", 7)) {
-
-            if (!port || add_client (&info->addr, port)) {
-                response_bad (&response_head);
-            } else {
-                response_ok (&response_head);
-#ifdef P2PSERV_LOG
-                printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->paddr, port);
-#endif
-            }
-        } else if (cmd_equal (cmd, "DISCONNECT", 10)) {
-
-            if (!port || remove_client (&info->addr, port)) {
-                response_bad (&response_head);
-            } else {
-                response_ok (&response_head);
-#ifdef P2PSERV_LOG
-                printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->paddr, port);
-#endif
-            }
-        } else if (cmd_equal (cmd, "LIST", 4)) {
-            struct response_node *jlist;
-            char *n = strtok_r (NULL, " \r\n", &p);
-            if (!port || !n || clients_to_json (&jlist, n)) {
-                response_bad (&response_head);
-            } else {
-                make_response_with_body (&response_head, jlist);
-#ifdef P2PSERV_LOG
-                printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, info->paddr, port);
-#endif
-            }
-        } else if (cmd_equal (cmd, "EXIT", 4)) {
+        // dispatch
+        if (!cmd)
+            send_error (info->sock);
+        else if (cmd_equal (cmd, "CONNECT", 7))
+            process_connect (info, args);
+        else if (cmd_equal (cmd, "DISCONNECT", 10))
+            process_disconnect (info, args);
+        else if (cmd_equal (cmd, "LIST", 4))
+            process_list (info, args);
+        else if (cmd_equal (cmd, "DISCOVER", 8))
+            process_discover (info, args);
+        else if (cmd_equal (cmd, "EXIT", 4))
             break;
-        } else {
-            response_bad (&response_head);
-        }
-
-        // send response
-        if (send_response (info->sock, response_head.next) == -1) {
-            free_response (response_head.next);
-            break;
-        }
-        free_response (response_head.next);
+        else
+            send_error (info->sock);
     }
 
+    // clean up
     close (info->sock);
     pthread_mutex_lock (&tcp_threads_lock);
     tcp_threads--;
