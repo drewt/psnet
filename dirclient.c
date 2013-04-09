@@ -258,16 +258,48 @@ cleanup:
 }
 
 /*-----------------------------------------------------------------------------
- * Sends a LIST command to the directory given by 'host' and 'port', parses the
- * response, and puts it in prev->next */
+ * Sends a DISCOVER command to the directory given by 'host' and 'port', parses
+ * the response, and puts it in prev->next */
 //-----------------------------------------------------------------------------
-int dir_get_list (struct node_list *prev, char *host, char *port)
+int dir_discover (struct node_list *prev, char *host, char *host_port,
+        char *listen_port, int n)
 {
     int status;
     char *list;
-    char cmd[22];
 
-    snprintf (cmd, 22, "LIST %d %d\r\n\r\n", 1220, 32);
+#define DISCOVER_STRLEN (20 + PORT_STRLEN)
+    char cmd[DISCOVER_STRLEN];
+    snprintf (cmd, DISCOVER_STRLEN, "DISCOVER %s %d\r\n\r\n", listen_port, n);
+#undef DISCOVER_STRLEN
+
+    if (send_command (&list, cmd, host, host_port, &status) < 1) {
+        fprintf (stderr, "get_list: failed to retrieve list from directory\n");
+        return -1;
+    }
+    if (parse_node_array (prev, list, 32)) {
+        fprintf (stderr, "invalid router list from directory server\n");
+        free (list);
+        return -1;
+    }
+
+    free (list);
+    return 0;
+}
+
+/*-----------------------------------------------------------------------------
+ * Sends a LIST command to the directory given by 'host' and 'port', parses the
+ * response, and puts it in prev->next */
+//-----------------------------------------------------------------------------
+int dir_list (struct node_list *prev, char *host, char *port, int n)
+{
+    int status;
+    char *list;
+
+#define LIST_STRLEN 15
+    char cmd[LIST_STRLEN];
+    snprintf (cmd, LIST_STRLEN, "LIST %d\r\n\r\n", n);
+#undef LIST_STRLEN
+
     if (send_command (&list, cmd, host, port, &status) < 1) {
         fprintf (stderr, "get_list: failed to retrieve list from directory\n");
         return -1;
@@ -285,8 +317,7 @@ int dir_get_list (struct node_list *prev, char *host, char *port)
 /*-----------------------------------------------------------------------------
  * Sends a CONNECT command to the directory given by 'host' and 'port' */
 //-----------------------------------------------------------------------------
-int dir_send_connect (char *host, char *host_port, char *listen_port,
-        int *status)
+int dir_connect (char *host, char *host_port, char *listen_port, int *status)
 {
 #define CONNECT_STRLEN (13 + PORT_STRLEN)
     char s[CONNECT_STRLEN];

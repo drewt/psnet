@@ -13,21 +13,25 @@
 #define DIR_ADDR "127.0.0.1"
 #define DIR_PORT "6666"
 
-static struct node_list routers_head;
+#define OUTDEGREE 32
+
+static struct node_list routers;
 static pthread_mutex_t routers_lock;
 
 static void __attribute((noreturn)) *router_update_thread (void *data)
 {
+    char *port = data;
+
     for(;;) {
         for (;;) {
             pthread_mutex_lock (&routers_lock);
-            if (!dir_get_list (&routers_head, DIR_ADDR, DIR_PORT))
+            if (!dir_discover (&routers, DIR_ADDR, DIR_PORT, port, OUTDEGREE))
                 break;
             fprintf (stderr, "get_list: failed to update router list\n");
             pthread_mutex_unlock (&routers_lock);
             sleep (DIR_RETRY_INTERVAL);
         }
-        for (struct node_list *it = routers_head.next; it; it = it->next) {
+        for (struct node_list *it = routers.next; it; it = it->next) {
             char s[INET6_ADDRSTRLEN];
             inet_ntop (it->addr.ss_family,
                     get_in_addr ((struct sockaddr*) &it->addr),
@@ -46,7 +50,7 @@ static void __attribute((noreturn)) *router_keepalive_thread (void *data)
     char *port = data;
 
     for(;;) {
-        if (dir_send_connect (DIR_ADDR, DIR_PORT, port, &status) == -1)
+        if (dir_connect (DIR_ADDR, DIR_PORT, port, &status) == -1)
             fprintf (stderr, "send_connect: failed to update directory\n");
         else if (status != STATUS_OKAY)
             fprintf (stderr, "send_connect: directory returned error %d\n",
@@ -59,8 +63,9 @@ void router_init (char *listen_port)
 {
     pthread_t tid;
 
+    routers.next = NULL;
     pthread_mutex_init (&routers_lock, NULL);
-    if (pthread_create (&tid, NULL, router_update_thread, NULL))
+    if (pthread_create (&tid, NULL, router_update_thread, listen_port))
         perror ("pthread_create");
     if (pthread_create (&tid, NULL, router_keepalive_thread, listen_port))
         perror ("pthread_create");
@@ -88,7 +93,7 @@ void flood_message (struct msg_info *mi)
     pthread_mutex_lock (&routers_lock);
 
     // send message to routers
-    for (it = routers_head.next; it; it = it->next) {
+    for (it = routers.next; it; it = it->next) {
         if (sockaddr_equals ((struct sockaddr*)it, (struct sockaddr*)&mi->addr))
             continue;
         send_message (mi, &it->addr);
