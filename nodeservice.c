@@ -1,82 +1,157 @@
-#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <pthread.h>
 
 #include "common.h"
-#include "request.h"
-#include "response.h"
-#include "client.h"
+#include "udp.h"
+#include "ctable.h"
+#include "router.h"
 
-void *handle_request (void *data) {
+#define JSMN_STRICT
+#include "jsmn.h"
 
-    struct conn_info *info;
+#define MAX_HOPS 4
 
-    char msg_buf[REQ_MAX];
-    char *cmd, *port, *p;
+/*static int udp_send_msg (const char *msg, size_t msg_len,
+        struct sockaddr_storage *dst)
+{
+    int s;
+    socklen_t ss_len;
 
-    struct response_node response_head;
-
-    info = data;
-
-    for(;;) {
-
-        // go to cleanup if connection was closed
-        if (!read_message (info->sock, msg_buf))
-            break;
-
-        // parse message
-        cmd  = strtok_r (msg_buf, " \r\n", &p);
-        port = strtok_r (NULL,    " \r\n", &p);
-
-        // construct response
-        response_head.next = NULL;
-        if (!cmd) {
-            response_bad (&response_head);
-        } else if (cmd_equal (cmd, "KEEP-ALIVE", 10)) {
-
-            if (!port || add_client (info->addr, port)) {
-                response_bad (&response_head);
-            } else {
-                response_ok (&response_head);
-#ifdef P2PSERV_LOG
-                printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->addr, port);
-#endif
-            }
-        } else if (cmd_equal (cmd, "LEAVE", 5)) {
-
-            if (!port || remove_client (info->addr, port)) {
-                response_bad (&response_head);
-            } else {
-                response_ok (&response_head);
-#ifdef P2PSERV_LOG
-                printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->addr, port);
-#endif
-            }
-        } else if (cmd_equal (cmd, "DISCOVER", 8)) {
-            response_ok (&response_head); // TODO
-        } else if (cmd_equal (cmd, "SEARCH", 6)) {
-            response_ok (&response_head); // TODO
-        } else if (cmd_equal (cmd, "EXIT", 4)) {
-            break;
-        } else {
-            response_bad (&response_head);
-        }
-
-        // send response
-        send_response (info->sock, response_head.next);
-        free_response (response_head.next);
+    if ((s = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+        perror ("socket");
+        return;
     }
 
-    close (info->sock);
-    pthread_mutex_lock (&num_threads_lock);
-    num_threads--;
-    pthread_mutex_unlock (&num_threads_lock);
-#ifdef P2PSERV_LOG
-    printf ("D %s\n", info->addr); fflush (stdout);
-#endif
-    free (info);
-    pthread_exit(NULL);
+    ss_len = sizeof (*dst);
+    if (sendto (s, msg, msg_len, 0, (struct sockaddr*) dst, ss_len) == -1)
+        perror ("sendto");
+}*/
+
+static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
+{
+    int port;
+    long lport;
+
+    if ((port = jsmn_get_value (mi->msg, tok, "port")) == -1)
+        return;
+
+    lport = strtol (mi->msg+tok[port].start, NULL, 10);
+    if (lport < PORT_MIN || lport > PORT_MAX)
+        return;
+
+    set_in_port ((struct sockaddr*)&mi->addr, (in_port_t) lport);
+
+    // add client to ctable
+
+}
+
+static void process_search (struct msg_info *mi, jsmntok_t *tok, int ntok)
+{
+    struct sockaddr_storage ss;
+    int hops, hop_port;
+    char *msg = mi->msg;
+    char v;
+    long lport;
+    
+    if ((hops = jsmn_get_value (msg, tok, "hops")) == -1)
+        return;
+
+    if ((hop_port = jsmn_get_value (msg, tok, "hop-port")) == -1)
+        return;
+
+    v = msg[tok[hops].start];
+    if (v < '0' || v > '0' + MAX_HOPS)
+        return;
+    msg[tok[hops].start]++;
+
+    lport = strtol (msg+tok[hop_port].start, NULL, 10);
+    if (lport < PORT_MIN || lport > PORT_MAX)
+        return;
+
+    ss = mi->addr;
+    if (ss.ss_family == AF_INET)
+        ((struct sockaddr_in*)&ss)->sin_port = (in_port_t) lport;
+    else
+        ((struct sockaddr_in6*)&ss)->sin6_port = (in_port_t) lport;
+
+    flood_message (mi);
+
+    printf ("hops: %.*s\nhop-port: %.*s\nmsg: %s\n",
+            jsmn_toklen (&tok[hops]), msg+tok[hops].start,
+            jsmn_toklen (&tok[hop_port]), msg+tok[hop_port].start,
+            msg);
+}
+
+static void *handle_message (void *data)
+{
+    struct msg_info *msg = data;
+    jsmn_parser p;
+    jsmntok_t tok[256];
+    int rc;
+
+    // parse message
+    jsmn_init (&p);
+    rc = jsmn_parse (&p, msg->msg, tok, 256);
+    if (rc != JSMN_SUCCESS || tok[0].type != JSMN_OBJECT)
+        goto cleanup;
+
+    // determine method
+    int method = jsmn_get_value (msg->msg, tok, "method");
+    if (method == -1)
+        goto cleanup;
+
+    // dispatch
+    if (jsmn_tokeq (msg->msg, &tok[method], "connect"))
+        process_connect (msg, tok, p.toknext);
+    else if (jsmn_tokeq (msg->msg, &tok[method], "search"))
+        process_search (msg, tok, p.toknext);
+
+cleanup:
+    pthread_mutex_lock (&udp_threads_lock);
+    udp_threads--;
+    pthread_mutex_unlock (&udp_threads_lock);
+    free (msg);
+    pthread_exit (NULL);
+}
+
+static void __attribute((noreturn)) usage (void)
+{
+    puts ("usage: infranode [nclients] [port]\n"
+          "\twhere 'nclients' is the maximum number of threads\n"
+          "\tand 'port' is the port number to listen on");
+    exit (EXIT_FAILURE);
+}
+
+int main (int argc, char *argv[])
+{
+    char *endptr;
+    int sockfd;
+    int max_threads;
+
+    if (argc != 3)
+        usage ();
+
+    endptr = NULL;
+    max_threads = strtol (argv[1], &endptr, 10);
+    if (max_threads < 1 || (endptr && *endptr != '\0')) {
+        fprintf (stderr, "error: 'nclients' must be a positive integer\n");
+        usage ();
+    }
+
+    endptr = NULL;
+    if (strtol (argv[2], &endptr, 10) < 1 || (endptr && *endptr != '\0')) {
+        fprintf (stderr, "error: 'port' must be a positive integer\n");
+        usage ();
+    }
+
+    ctable_init ();
+    router_init ();
+    sockfd = udp_server_init (argv[2]);
+
+    udp_server_main (sockfd, max_threads, handle_message);
 }

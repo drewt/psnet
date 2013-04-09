@@ -16,7 +16,7 @@
 #define HT_SIZE 10
 #endif
 
-typedef struct net_node data_t;
+typedef struct sockaddr_storage data_t;
 
 /* defined in ctable.c */
 void ctable_init (void);

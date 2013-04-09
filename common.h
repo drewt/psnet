@@ -3,8 +3,12 @@
  * Author: Drew Thoreson
  */
 
+#ifndef _P2P_COMMON_H_
+#define _P2P_COMMON_H_
+
+#include <string.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
-#include <pthread.h>
 
 #ifdef DAEMON
 #define ANSI_YELLOW ""
@@ -18,17 +22,65 @@
 #define ANSI_RESET  "\x1b[0m"
 #endif
 
-struct conn_info {
-    int sock;
-    char addr[INET6_ADDRSTRLEN];
+#define PORT_MIN 0
+#define PORT_MAX 65535
+
+#ifdef DAEMON
+void daemonize (void);
+#endif
+
+/* linked list of sockaddr* structures */
+struct node_list {
+    struct sockaddr_storage addr;
+    struct node_list *next;
 };
 
-struct net_node {
-    in_addr_t ip;   // XXX: IPv4 only
-    in_port_t port;
-};
+static inline void *get_in_addr (struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET)
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
 
-void *handle_request (void *data);
+static inline in_port_t get_in_port (struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET)
+        return ((struct sockaddr_in*)sa)->sin_port;
+    return ((struct sockaddr_in6*)sa)->sin6_port;
+}
 
-extern int num_threads;
-extern pthread_mutex_t num_threads_lock;
+static inline void set_in_port (struct sockaddr *sa, in_port_t val)
+{
+    if (sa->sa_family == AF_INET)
+        ((struct sockaddr_in*)sa)->sin_port = val;
+    else
+        ((struct sockaddr_in6*)sa)->sin6_port = val;
+}
+
+static inline int sin_equals (const struct sockaddr_in *a,
+        const struct sockaddr_in *b)
+{
+    return a->sin_addr.s_addr == b->sin_addr.s_addr &&
+        a->sin_port == b->sin_port;
+}
+
+static inline int sin6_equals (const struct sockaddr_in6 *a,
+        const struct sockaddr_in6 *b)
+{
+    return !memcmp (a->sin6_addr.s6_addr, b->sin6_addr.s6_addr, 16) &&
+        a->sin6_port == b->sin6_port;
+}
+
+static inline int sockaddr_equals (const struct sockaddr *a,
+        const struct sockaddr *b)
+{
+    if (a->sa_family != b->sa_family)
+        return 0;
+    if (a->sa_family == AF_INET)
+        return sin_equals ((struct sockaddr_in*)a, (struct sockaddr_in*)b);
+    else if (a->sa_family == AF_INET6)
+        return sin6_equals ((struct sockaddr_in6*)a, (struct sockaddr_in6*)b);
+    return 0;
+}
+
+#endif

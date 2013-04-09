@@ -19,34 +19,21 @@
 #include <pthread.h>
 
 #include "common.h"
-#include "ctable.h"
+#include "tcp.h"
 
 #define BACKLOG 10
 
 #define LOG_FILE_PATH "/tmp/p2pservlog"
 
-int num_threads;
-pthread_mutex_t num_threads_lock;
-
-static void usage (void) {
-    puts ("usage: server [nclients] [port]\n"
-          "\twhere 'nclients' is the maximum number of clients\n"
-          "\tand 'port' is the port number to listen on");
-    exit (EXIT_FAILURE);
-}
-
-void *get_in_addr (struct sockaddr *sa) {
-    if (sa->sa_family == AF_INET)
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
-}
+int tcp_threads;
+pthread_mutex_t tcp_threads_lock;
 
 #ifdef DAEMON
 /*-----------------------------------------------------------------------------
  * Run the server in the background */
 //-----------------------------------------------------------------------------
-void daemonize (void) {
+void daemonize (void)
+{
     pid_t pid, sid;
 
     pid = fork ();
@@ -79,7 +66,8 @@ void daemonize (void) {
 /*-----------------------------------------------------------------------------
  * Initialize the server to listen on the given port */
 //-----------------------------------------------------------------------------
-static int server_init (char *port) {
+int tcp_server_init (char *port)
+{
     struct addrinfo hints, *servinfo, *p;
     const int yes = 1;
     int sockfd;
@@ -130,98 +118,63 @@ static int server_init (char *port) {
         exit (EXIT_FAILURE);
     }
 
+    tcp_threads = 0;
+    pthread_mutex_init (&tcp_threads_lock, NULL);
+
     return sockfd;
 }
 
 /*-----------------------------------------------------------------------------
  * The server's main accept() loop */
 //-----------------------------------------------------------------------------
-static void __attribute((noreturn)) server_main (int sockfd, int max_threads) {
-    struct sockaddr_storage their_addr;
+void __attribute((noreturn)) tcp_server_main (int sockfd, int max_threads,
+        void*(*cb)(void*))
+{
     socklen_t sin_size;
     struct conn_info *targ;
     pthread_t tid;
-    int new_fd;
 
     struct timeval tv = { .tv_sec = 30, .tv_usec = 0 };
 
     for (;;) {
 
+        targ = malloc (sizeof (struct conn_info));
+
         // wait for a connection
-        sin_size = sizeof (their_addr);
-        new_fd = accept (sockfd, (struct sockaddr*) &their_addr, &sin_size);
-        if (new_fd == -1) {
+        sin_size = sizeof (targ->addr);
+        targ->sock = accept (sockfd, (struct sockaddr*) &targ->addr, &sin_size);
+        if (targ->sock == -1) {
             perror ("accept");
+            free (targ);
             continue;
         }
 
         // close connection if thread limit reached
-        pthread_mutex_lock (&num_threads_lock);
-        if (num_threads >= max_threads) {
+        pthread_mutex_lock (&tcp_threads_lock);
+        if (tcp_threads >= max_threads) {
             fprintf (stderr, "thread limit reached; refusing connection\n");
-            pthread_mutex_unlock (&num_threads_lock);
-            close (new_fd);
+            pthread_mutex_unlock (&tcp_threads_lock);
+            close (targ->sock);
+            free (targ);
             continue;
         }
 
-        num_threads++;
-        pthread_mutex_unlock (&num_threads_lock);
+        tcp_threads++;
+        pthread_mutex_unlock (&tcp_threads_lock);
 
-        setsockopt (new_fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv, sizeof (tv));
+        setsockopt (targ->sock, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv,
+                sizeof (tv));
 
-        targ = malloc (sizeof (struct conn_info));
-        targ->sock = new_fd;
-        inet_ntop (their_addr.ss_family,
-                get_in_addr ((struct sockaddr*) &their_addr),
-                targ->addr, sizeof targ->addr);
 #ifdef P2PSERV_LOG
-        printf ("C %s\n", targ->addr);
+        inet_ntop (targ->addr.ss_family,
+                get_in_addr ((struct sockaddr*) &targ->addr),
+                targ->paddr, sizeof targ->paddr);
+        printf ("C %s\n", targ->paddr);
 #endif
         // create a new thread to service the connection
-        if (pthread_create (&tid, NULL, handle_request, targ))
+        if (pthread_create (&tid, NULL, cb, targ))
             perror ("pthread_create");
         if (pthread_detach (tid))
             perror ("pthread_detach");
     }
-}
-
-/*-----------------------------------------------------------------------------
- * main... */
-//-----------------------------------------------------------------------------
-int main (int argc, char *argv[]) {
-
-    char *endptr;
-    int sockfd;
-    int max_threads;
-
-    if (argc != 3)
-        usage ();
-
-    endptr = NULL;
-    max_threads = strtol (argv[1], &endptr, 10);
-    if (max_threads < 1 || (endptr && *endptr != '\0')) {
-        puts ("error: 'nclients' must be an integer greater than 0");
-        usage ();
-    }
-
-    endptr = NULL;
-    if (strtol (argv[2], &endptr, 10) < 1 || (endptr && *endptr != '\0')) {
-        puts ("error: 'port' must be an integer greater than 0");
-        usage ();
-    }
-
-#ifdef DAEMON
-    daemonize ();
-#endif
-
-    // initialize shared variable
-    num_threads = 0;
-    pthread_mutex_init (&num_threads_lock, NULL);
-
-    ctable_init ();
-    sockfd = server_init (argv[2]);
-
-    server_main (sockfd, max_threads);
-
-    return 0;
 }

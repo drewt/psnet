@@ -9,88 +9,89 @@
 #include "response.h"
 #include "ctable.h"
 
-#define PORT_MIN 0
-#define PORT_MAX 65535
-
-unsigned int ctable_hash (const struct net_node *client) {
-    return client->ip + client->port;
+unsigned int ctable_hash (const struct sockaddr_storage *client)
+{
+    if (client->ss_family == AF_INET) {
+        struct sockaddr_in *c4 = (struct sockaddr_in*) client;
+        return c4->sin_addr.s_addr + c4->sin_port;
+    } else if (client->ss_family == AF_INET6) {
+        struct sockaddr_in6 *c6 = (struct sockaddr_in6*) client;
+        return (in_addr_t) c6->sin6_addr.s6_addr[0] + c6->sin6_port;
+    }
+    return 0;
 }
 
-bool ctable_equals (const struct net_node *a, const struct net_node *b) {
-    return a->ip == b->ip && a->port == b->port;
+bool ctable_equals (const struct sockaddr_storage *a,
+        const struct sockaddr_storage *b)
+{
+    return sockaddr_equals ((const struct sockaddr*) a,
+            (const struct sockaddr*) b);
 }
 
-void ctable_act (const struct net_node *client) {
+void ctable_act (const struct sockaddr_storage *client)
+{
 #ifdef P2PSERV_LOG
-    char addr[20];
-    inet_ntop (AF_INET, &client->ip, addr, 20);
-    printf (ANSI_RED "X %s %d\n" ANSI_RESET, addr, client->port);
+    char addr[INET6_ADDRSTRLEN];
+    inet_ntop (client->ss_family, get_in_addr ((struct sockaddr*) client),
+            addr, sizeof addr);
+    printf (ANSI_RED "X %s %d\n" ANSI_RESET, addr,
+            get_in_port ((struct sockaddr*) client));
     fflush (stdout);
 #endif
 }
 
-void ctable_free (struct net_node *client) {
+void ctable_free (struct sockaddr_storage *client)
+{
     free (client);
 }
 
-/*-----------------------------------------------------------------------------
- * Fills out a client structure with the given ip and port number, ensuring
- * that the arguments are valid */
-//-----------------------------------------------------------------------------
-static int make_client (struct net_node *client, const char *ip,
-        const char *port) {
-    struct in_addr addr;
+static int make_client (struct sockaddr_storage *addr, const char *port)
+{
     char *endptr;
     long lport;
 
-    if (!inet_aton (ip, &addr))
-        return CL_BADIP;
-
     lport = strtol (port, &endptr, 10);
     if (lport < PORT_MIN || lport > PORT_MAX || *endptr != '\0')
-        return CL_BADPORT;
+        return -1;
 
-    *client = (struct net_node)
-        { .ip = addr.s_addr, .port = (in_port_t) lport };
-
-    return CL_OK;
+    if (addr->ss_family == AF_INET)
+        ((struct sockaddr_in*)addr)->sin_port = (in_port_t) lport;
+    else if (addr->ss_family == AF_INET6)
+        ((struct sockaddr_in6*)addr)->sin6_port = (in_port_t) lport;
+    else
+        return -1;
+    return 0;
 }
 
 /*-----------------------------------------------------------------------------
  * Adds a client to the network */
 //-----------------------------------------------------------------------------
-int add_client (const char *ip, const char *port) {
-    struct net_node *client;
-    int rc;
+int add_client (struct sockaddr_storage *addr, const char *port)
+{
+    struct sockaddr_storage *client;
 
-    client = malloc (sizeof (struct net_node));
-    if ((rc = make_client (client, ip, port)))
-        return rc;
+    client = malloc (sizeof (struct sockaddr_storage));
+    *client = *addr;
+
+    if (make_client (client, port))
+        return -1;
 
     ctable_insert (client);
-
-    return CL_OK;
+    return 0;
 }
 
 /*-----------------------------------------------------------------------------
  * Removes a client from the network */
 //-----------------------------------------------------------------------------
-int remove_client (const char *ip, const char *port) {
-    struct net_node client;
-    int rc;
+int remove_client (struct sockaddr_storage *addr, const char *port)
+{
+    struct sockaddr_storage client = *addr;
 
-    if ((rc = make_client (&client, ip, port)))
-        return rc;
+    if (make_client (&client, port))
+        return -1;
 
     if (ctable_remove (&client))
-        return CL_NOTFOUND;
-
-    return CL_OK;
-}
-
-int print_client (const struct net_node *client, void *data) {
-    FILE *stream = data;
-    fprintf (stream, "{ %d, %d }\n", client->ip, client->port);
+        return -1;
     return 0;
 }
 
@@ -105,25 +106,29 @@ struct make_list_arg {
  * Constructs a JSON representation of the given client structure and inserts
  * it into the list given in the argument */
 //-----------------------------------------------------------------------------
-static int make_list (const struct net_node *client, void *data) {
-
+static int make_list (const struct sockaddr_storage *client, void *data)
+{
     struct make_list_arg *arg = data;
     if (arg->i >= arg->n)
         return 1;
     arg->i++;
 
-    char addr[20];
-    inet_ntop (AF_INET, &client->ip, addr, 20);
+    char addr[INET6_ADDRSTRLEN];
+    inet_ntop (client->ss_family, get_in_addr ((struct sockaddr*) client),
+                addr, sizeof addr);
 
     struct response_node *node = malloc (sizeof (struct response_node));
 
-    node->data = malloc (38);
+    node->data = malloc (100);
 #ifdef LISP_OUTPUT
-    node->size = snprintf (node->data, 100, "(:ip \"%s\" :port %d) ",
-            addr, client->port);
+    node->size = snprintf (node->data, 100, "(:ip \"%s\" :port %d :ipv %d) ",
+            addr, get_in_port ((struct sockaddr*) client),
+            client->ss_family == AF_INET ? 4 : 6);
 #else
-    node->size = snprintf (node->data, 100, "{\"ip\":\"%s\",\"port\":%d},",
-            addr, client->port);
+    node->size = snprintf (node->data, 100,
+            "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},",
+            addr, get_in_port ((struct sockaddr*) client),
+            client->ss_family == AF_INET ? 4 : 6);
 #endif
     node->next = NULL;
 
@@ -137,7 +142,8 @@ static int make_list (const struct net_node *client, void *data) {
  * Constructs a JSON array from the server's list of clients, excluding the
  * client given by the supplied IP address and port number */
 //-----------------------------------------------------------------------------
-int clients_to_json (struct response_node **dest, const char *n) {
+int clients_to_json (struct response_node **dest, const char *n)
+{
     int num;
     char *endptr;
     struct make_list_arg arg;
