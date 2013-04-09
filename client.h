@@ -13,6 +13,7 @@ enum client_rc {
 
 int add_client (struct sockaddr_storage *addr, const char *port);
 int remove_client (struct sockaddr_storage *addr, const char *port);
-int clients_to_json (struct response_node **dest, const char *n);
+int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
+        const char *n);
 
 #endif

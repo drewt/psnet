@@ -98,6 +98,7 @@ int remove_client (struct sockaddr_storage *addr, const char *port)
 /* argument to the make_list() function */
 struct make_list_arg {
     struct response_node *prev;
+    struct sockaddr_storage *ignore;
     int i;
     int n;
 };
@@ -111,6 +112,8 @@ static int make_list (const struct sockaddr_storage *client, void *data)
     struct make_list_arg *arg = data;
     if (arg->i >= arg->n)
         return 1;
+    if (arg->ignore && ctable_equals (client, arg->ignore))
+        return 0;
     arg->i++;
 
     char addr[INET6_ADDRSTRLEN];
@@ -142,7 +145,8 @@ static int make_list (const struct sockaddr_storage *client, void *data)
  * Constructs a JSON array from the server's list of clients, excluding the
  * client given by the supplied IP address and port number */
 //-----------------------------------------------------------------------------
-int clients_to_json (struct response_node **dest, const char *n)
+int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
+        const char *n)
 {
     int num;
     char *endptr;
@@ -155,6 +159,7 @@ int clients_to_json (struct response_node **dest, const char *n)
 
     arg.i = 0;
     arg.n = num;
+    arg.ignore = ign;
     arg.prev = malloc (sizeof (struct response_node));
 #ifdef LISP_OUTPUT
     arg.prev->data = strdup ("(");

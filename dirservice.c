@@ -92,7 +92,7 @@ static void process_list (struct conn_info *info, char *args)
     char *n, *p;
     
     n = strtok_r (args, REQ_DELIM, &p);
-    if (!n || clients_to_json (&jlist, n)) {
+    if (!n || clients_to_json (&jlist, NULL, n)) {
         send_error (info->sock);
         return;
     }
@@ -113,13 +113,23 @@ static void process_discover (struct conn_info *info, char *args)
     struct response_node response_head;
     struct response_node *jlist;
     char *port, *n, *p;
+    char *endptr;
+    long lport;
     
-    n    = strtok_r (args, REQ_DELIM, &p);
-    port = strtok_r (NULL, REQ_DELIM, &p);
-    if (!n || !port || clients_to_json (&jlist, n)) {
-        send_error (info->sock);
-        return;
-    }
+    port = strtok_r (args, REQ_DELIM, &p);
+    n    = strtok_r (NULL, REQ_DELIM, &p);
+    if (!n || !port)
+        goto bail_error;
+
+    printf ("DISCOVER %s %s\n", port, n);
+
+    lport = strtol (port, &endptr, 10);
+    if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0'))
+        goto bail_error;
+
+    set_in_port ((struct sockaddr*)&info->addr, (in_port_t) lport);
+    if (clients_to_json (&jlist, &info->addr, n))
+        goto bail_error;
 
     make_response_with_body (&response_head, jlist);
 #ifdef P2PSERV_LOG
@@ -127,6 +137,10 @@ static void process_discover (struct conn_info *info, char *args)
 #endif
     send_response (info->sock, response_head.next);
     free_response (response_head.next);
+    return;
+
+bail_error:
+    send_error (info->sock);
 }
 
 /*-----------------------------------------------------------------------------

@@ -36,14 +36,14 @@ struct node_list {
     struct node_list *next;
 };
 
-static inline void *get_in_addr (struct sockaddr *sa)
+static inline void *get_in_addr (const struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET)
         return &(((struct sockaddr_in*)sa)->sin_addr);
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-static inline in_port_t get_in_port (struct sockaddr *sa)
+static inline in_port_t get_in_port (const struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET)
         return ((struct sockaddr_in*)sa)->sin_port;
