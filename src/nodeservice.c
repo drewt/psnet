@@ -10,6 +10,7 @@
 #include "common.h"
 #include "udp.h"
 #include "ctable.h"
+#include "client.h"
 #include "router.h"
 
 #define JSMN_STRICT
@@ -22,12 +23,13 @@
 static char *udp_listen_port;
 static size_t udp_listen_port_strlen;
 
+/*-----------------------------------------------------------------------------
+ * Process a 'ping' packet: send a pong */
+//-----------------------------------------------------------------------------
 static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    int rv;
     int port;
     long lport;
-    char pong[PONG_MAX];
 
     if ((port = jsmn_get_value (mi->msg, tok, "port")) == -1)
         return;
@@ -43,10 +45,7 @@ static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
             get_in_port ((struct sockaddr*)&mi->addr));
 #endif
 
-    rv = snprintf (pong, PONG_MAX, "{\"method\":\"pong\",\"port\":%s}",
-            udp_listen_port);
-
-    udp_send_msg (pong, rv, &mi->addr);
+    udp_send_msg ("{\"method\":\"pong\"}", 17, &mi->addr);
 }
 
 /*-----------------------------------------------------------------------------
@@ -55,19 +54,19 @@ static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
 static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
     int port;
-    long lport;
 
     if ((port = jsmn_get_value (mi->msg, tok, "port")) == -1)
         return;
 
-    lport = strtol (mi->msg+tok[port].start, NULL, 10);
-    if (lport < PORT_MIN || lport > PORT_MAX)
+    mi->msg[tok[port].end] = '\0';
+
+    if (add_client (&mi->addr, mi->msg + tok[port].start))
         return;
 
-    set_in_port ((struct sockaddr*)&mi->addr, (in_port_t) lport);
-
-    // add client to ctable
-
+#ifdef P2PSERV_LOG
+    printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, mi->paddr,
+            mi->msg + tok[port].start);
+#endif
 }
 
 /*-----------------------------------------------------------------------------
