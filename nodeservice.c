@@ -21,37 +21,18 @@
 
 static char *udp_listen_port;
 
-static void udp_send_msg (const char *msg, size_t len, struct sockaddr *dst)
+static void udp_send_msg (const char *msg, size_t len,
+        struct sockaddr_storage *dst)
 {
-    struct addrinfo hints, *servinfo;
-    char paddr[INET6_ADDRSTRLEN];
-    char pport[PORT_STRLEN+1];
-    int s, rc;
-
-    // TODO: find out why manually packed sockaddr doesn't work
-    inet_ntop (dst->sa_family, get_in_addr (dst), paddr, sizeof (*dst));
-    snprintf (pport, PORT_STRLEN+1, "%d", get_in_port (dst));
+    int s;
 
     if ((s = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         perror ("socket");
         return;
     }
 
-    memset (&hints, 0, sizeof (hints));
-    hints.ai_family   = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_protocol = IPPROTO_UDP;
-    hints.ai_flags    = AI_PASSIVE;
-
-    if ((rc = getaddrinfo (paddr, pport, &hints, &servinfo))) {
-        fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (rc));
-        exit (EXIT_FAILURE);
-    }
-
-    if (sendto (s, msg, len, 0, servinfo->ai_addr, servinfo->ai_addrlen) == -1)
+    if (sendto (s, msg, len, 0, (struct sockaddr*) dst, sizeof *dst) == -1)
         perror ("sendto");
-
-    freeaddrinfo (servinfo);
 }
 
 static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
@@ -68,7 +49,7 @@ static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
     if (lport < PORT_MIN || lport > PORT_MAX)
         return;
 
-    set_in_port ((struct sockaddr*)&mi->addr, (in_port_t) lport);
+    set_in_port ((struct sockaddr*)&mi->addr, htons((in_port_t) lport));
 
 #ifdef P2PSERV_LOG
     printf (ANSI_YELLOW "P %s %d\n" ANSI_RESET, mi->paddr,
@@ -78,7 +59,7 @@ static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
     rv = snprintf (pong, PONG_MAX, "{\"method\":\"pong\",\"port\":%s}",
             udp_listen_port);
 
-    udp_send_msg (pong, rv, (struct sockaddr*) &mi->addr);
+    udp_send_msg (pong, rv, &mi->addr);
 }
 
 /*-----------------------------------------------------------------------------
