@@ -1,7 +1,8 @@
 #ifndef _P2P_UDP_H_
 #define _P2P_UDP_H_
 
-#include "common.h"
+#include <sys/socket.h>
+#include <pthread.h>
 
 #define UDP_MSG_MAX 128
 
@@ -19,7 +20,8 @@ struct msg_info {
 int udp_threads;
 pthread_mutex_t udp_threads_lock;
 
-void udp_send_msg (const char *msg, size_t len, struct sockaddr_storage *dst);
+void udp_send_msg (const char *msg, size_t len,
+        const struct sockaddr_storage *dst);
 
 int udp_server_init (char *port);
 void __attribute((noreturn)) udp_server_main (int sockfd, int max_threads,

@@ -28,22 +28,29 @@ $(BIN)/ctable_test: $(BIN)/ctable_test.o $(BIN)/ctable.o
 	$(CC) $(CFLAGS) $(BIN)/ctable_test.o $(BIN)/ctable.o -o $(BIN)/test
 
 $(OFILES): $(INC)/common.h
+
+# common
 $(BIN)/tcpserver.o: $(INC)/tcp.h
 $(BIN)/udpserver.o: $(INC)/udp.h
 $(BIN)/request.o: $(INC)/tcp.h
 $(BIN)/response.o: $(INC)/response.h
 $(BIN)/ctable.o: $(INC)/ctable.h
-$(BIN)/client.o: $(INC)/client.h $(INC)/ctable.h $(INC)/response.h
-$(BIN)/dirservice.o: $(INC)/tcp.h $(INC)/ctable.h $(INC)/response.h $(INC)/client.h
-$(BIN)/nodeservice.o: $(INC)/udp.h $(INC)/ctable.h $(INC)/router.h $(INC)/client.h \
-    $(INC)/jsmn.h
-$(BIN)/dirclient.o: $(INC)/dirclient.h $(INC)/tcp.h $(INC)/jsmn.h
-$(BIN)/nodelist.o: $(INC)/nodelist.h $(INC)/jsmn.h
+$(BIN)/client.o: $(INC)/client.h $(INC)/response.h $(INC)/ctable.h
 $(BIN)/jsmn.o: $(INC)/jsmn.h
 
+# directory
+$(BIN)/dirservice.o: $(INC)/tcp.h $(INC)/response.h $(INC)/client.h $(INC)/ctable.h
+
+# router
+$(BIN)/nodeservice.o: $(INC)/udp.h $(INC)/ctable.h $(INC)/client.h $(INC)/router.h \
+    $(INC)/jsmn.h
+$(BIN)/dirclient.o: $(INC)/dirclient.h $(INC)/nodelist.h $(INC)/tcp.h $(INC)/jsmn.h
+$(BIN)/nodelist.o: $(INC)/nodelist.h $(INC)/jsmn.h
+$(BIN)/router.o: $(INC)/router.h $(INC)/udp.h $(INC)/ctable.h $(INC)/nodelist.h \
+    $(INC)/dirclient.h
+
 clean:
-	rm -f $(OFILES) $(DIROFILES) $(NODEOFILES) $(BIN)/ctable_test.o $(XFILES) \
-	    $(BIN)/ctable_test
+	rm -f $(BIN)/*
 
 dirmem: infradir
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \

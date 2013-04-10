@@ -6,8 +6,9 @@
 #include <pthread.h>
 
 #include "common.h"
-#include "udp.h"
 #include "router.h"
+#include "udp.h"
+#include "ctable.h"
 #include "nodelist.h"
 #include "dirclient.h"
 
@@ -72,6 +73,13 @@ void router_init (char *listen_port)
         perror ("pthread_create");
 }
 
+static int fwd_to_client (const struct sockaddr_storage *client, void *arg)
+{
+    struct msg_info *mi = arg;
+    udp_send_msg (mi->msg, mi->len, client);
+    return 0;
+}
+
 void flood_message (struct msg_info *mi)
 {
     struct node_list *it;
@@ -86,7 +94,7 @@ void flood_message (struct msg_info *mi)
     }
 
     // send message to clients
-
+    ctable_foreach (fwd_to_client, mi);
 
     pthread_mutex_unlock (&routers_lock);
 }

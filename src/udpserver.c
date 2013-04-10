@@ -15,8 +15,9 @@
 int udp_threads;
 pthread_mutex_t udp_threads_lock;
 
-// XXX: doesn't really belong here, but doesn't belong anwhere else either
-void udp_send_msg (const char *msg, size_t len, struct sockaddr_storage *dst)
+// XXX: doesn't really belong here, but doesn't belong anywhere else either
+void udp_send_msg (const char *msg, size_t len,
+        const struct sockaddr_storage *dst)
 {
     socklen_t sin_size;
     int s;
