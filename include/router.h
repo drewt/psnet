@@ -15,6 +15,8 @@
 #define DIR_KEEPALIVE_INTERVAL 9
 #endif
 
+struct msg_info;
+
 void router_init (char *listen_port);
 void flood_message (struct msg_info *mi);
 
