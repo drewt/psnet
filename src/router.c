@@ -33,14 +33,12 @@ static void __attribute((noreturn)) *router_update_thread (void *data)
             pthread_mutex_unlock (&routers_lock);
             sleep (DIR_RETRY_INTERVAL);
         }
+#ifdef P2PSERV_LOG
         for (struct node_list *it = routers.next; it; it = it->next) {
-            char s[INET6_ADDRSTRLEN];
-            inet_ntop (it->addr.ss_family,
-                    get_in_addr ((struct sockaddr*) &it->addr),
-                    s, sizeof s);
-            printf ("node: %s:%d\n", s,
+            printf ("U %s %d\n", it->paddr,
                     ntohs (get_in_port ((struct sockaddr*) &it->addr)));
         }
+#endif
         pthread_mutex_unlock (&routers_lock);
         sleep (ROUTERS_UPDATE_INTERVAL);
     }

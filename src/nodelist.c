@@ -68,6 +68,11 @@ static int parse_node (struct node_list *prev, const char *msg, jsmntok_t *node)
 
     prev->next = malloc (sizeof (struct node_list));
     prev->next->addr = ss;
+#ifdef P2PSERV_LOG
+    strncpy (prev->next->paddr, msg + node[iip].start,
+            jsmn_toklen (&node[iip]));
+    prev->next->paddr[jsmn_toklen (&node[iip])] = '\0';
+#endif
 
     return 0;
 }
