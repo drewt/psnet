@@ -1,7 +1,7 @@
 #ifndef _P2P_CLIENT_H_
 #define _P2P_CLIENT_H_
 
-#include "response.h"
+#include <sys/socket.h>
 
 enum client_rc {
     CL_OK,
@@ -10,6 +10,8 @@ enum client_rc {
     CL_BADNUM,
     CL_NOTFOUND
 };
+
+struct response_node;
 
 int add_client (struct sockaddr_storage *addr, const char *port);
 int remove_client (struct sockaddr_storage *addr, const char *port);

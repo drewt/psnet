@@ -1,7 +1,7 @@
 #ifndef _P2P_NODELIST_H_
 #define _P2P_NODELIST_H_
 
-#include "common.h"
+#include <sys/socket.h>
 
 /* linked list of sockaddr* structures */
 struct node_list {

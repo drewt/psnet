@@ -3,6 +3,9 @@
 
 #include <sys/socket.h>
 #include <pthread.h>
+#ifdef P2PSERV_LOG
+#include <netinet/in.h>
+#endif
 
 #define UDP_MSG_MAX 128
 

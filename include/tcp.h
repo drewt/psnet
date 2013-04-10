@@ -1,7 +1,11 @@
 #ifndef _P2P_TCP_H_
 #define _P2P_TCP_H_
 
-#include "common.h"
+#include <sys/socket.h>
+#include <pthread.h>
+#ifdef P2PSERV_LOG
+#include <netinet/in.h>
+#endif
 
 #define TCP_MSG_MAX 100
 
