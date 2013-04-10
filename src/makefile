@@ -24,9 +24,6 @@ $(BIN)/infradir: $(OFILES) $(DIROFILES)
 $(BIN)/infranode: $(OFILES) $(NODEOFILES)
 	$(CC) $(CFLAGS) $(OFILES) $(NODEOFILES) -o $(BIN)/infranode -lm
 
-$(BIN)/ctable_test: $(BIN)/ctable_test.o $(BIN)/ctable.o
-	$(CC) $(CFLAGS) $(BIN)/ctable_test.o $(BIN)/ctable.o -o $(BIN)/test
-
 $(OFILES): $(INC)/common.h
 
 # common
