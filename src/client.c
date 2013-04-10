@@ -35,7 +35,7 @@ void ctable_act (const struct sockaddr_storage *client)
     inet_ntop (client->ss_family, get_in_addr ((struct sockaddr*) client),
             addr, sizeof addr);
     printf (ANSI_RED "X %s %d\n" ANSI_RESET, addr,
-            get_in_port ((struct sockaddr*) client));
+            ntohs (get_in_port ((struct sockaddr*) client)));
     fflush (stdout);
 #endif
 }
@@ -54,12 +54,7 @@ static int make_client (struct sockaddr_storage *addr, const char *port)
     if (lport < PORT_MIN || lport > PORT_MAX || *endptr != '\0')
         return -1;
 
-    if (addr->ss_family == AF_INET)
-        ((struct sockaddr_in*)addr)->sin_port = (in_port_t) lport;
-    else if (addr->ss_family == AF_INET6)
-        ((struct sockaddr_in6*)addr)->sin6_port = (in_port_t) lport;
-    else
-        return -1;
+    set_in_port ((struct sockaddr*) addr, htons ((in_port_t) lport));
     return 0;
 }
 
@@ -125,12 +120,12 @@ static int make_list (const struct sockaddr_storage *client, void *data)
     node->data = malloc (100);
 #ifdef LISP_OUTPUT
     node->size = snprintf (node->data, 100, "(:ip \"%s\" :port %d :ipv %d) ",
-            addr, get_in_port ((struct sockaddr*) client),
+            addr, ntohs (get_in_port ((struct sockaddr*) client)),
             client->ss_family == AF_INET ? 4 : 6);
 #else
     node->size = snprintf (node->data, 100,
             "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},",
-            addr, get_in_port ((struct sockaddr*) client),
+            addr, ntohs (get_in_port ((struct sockaddr*) client)),
             client->ss_family == AF_INET ? 4 : 6);
 #endif
     node->next = NULL;
