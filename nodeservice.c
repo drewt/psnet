@@ -89,7 +89,7 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
         return;
 
     v = msg[tok[hops].start];
-    if (v < '0' || v > '0' + MAX_HOPS)
+    if (v < '0' || v >= '0' + MAX_HOPS - 1)
         return;
     msg[tok[hops].start]++;
 

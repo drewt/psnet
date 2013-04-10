@@ -64,7 +64,7 @@ static int parse_node (struct node_list *prev, const char *msg, jsmntok_t *node)
     if (lport < PORT_MIN || lport > PORT_MAX || *endptr != '\0')
         return -1;
 
-    set_in_port ((struct sockaddr*) &ss, (in_port_t) lport);
+    set_in_port ((struct sockaddr*) &ss, htons ((in_port_t) lport));
 
     prev->next = malloc (sizeof (struct node_list));
     prev->next->addr = ss;

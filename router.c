@@ -38,7 +38,7 @@ static void __attribute((noreturn)) *router_update_thread (void *data)
                     get_in_addr ((struct sockaddr*) &it->addr),
                     s, sizeof s);
             printf ("node: %s:%d\n", s,
-                    get_in_port ((struct sockaddr*) &it->addr));
+                    ntohs (get_in_port ((struct sockaddr*) &it->addr)));
         }
         pthread_mutex_unlock (&routers_lock);
         sleep (ROUTERS_UPDATE_INTERVAL);
