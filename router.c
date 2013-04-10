@@ -72,21 +72,6 @@ void router_init (char *listen_port)
         perror ("pthread_create");
 }
 
-static void send_message (struct msg_info *mi, struct sockaddr_storage *dst)
-{
-    int s;
-    socklen_t ss_len;
-
-    if ((s = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-        perror ("socket");
-        return;
-    }
-
-    ss_len = sizeof (*dst);
-    if (sendto (s, mi->msg, mi->len, 0, (struct sockaddr*) dst, ss_len) == -1)
-        perror ("sendto");
-}
-
 void flood_message (struct msg_info *mi)
 {
     struct node_list *it;
@@ -97,7 +82,7 @@ void flood_message (struct msg_info *mi)
     for (it = routers.next; it; it = it->next) {
         if (sockaddr_equals ((struct sockaddr*)it, (struct sockaddr*)&mi->addr))
             continue;
-        send_message (mi, &it->addr);
+        udp_send_msg (mi->msg, mi->len, &it->addr);
     }
 
     // send message to clients

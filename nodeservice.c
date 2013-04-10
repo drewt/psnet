@@ -20,20 +20,7 @@
 #define PONG_MAX (25 + PORT_STRLEN)
 
 static char *udp_listen_port;
-
-static void udp_send_msg (const char *msg, size_t len,
-        struct sockaddr_storage *dst)
-{
-    int s;
-
-    if ((s = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-        perror ("socket");
-        return;
-    }
-
-    if (sendto (s, msg, len, 0, (struct sockaddr*) dst, sizeof *dst) == -1)
-        perror ("sendto");
-}
+static size_t udp_listen_port_strlen;
 
 static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
@@ -88,9 +75,8 @@ static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
  * message if it's reached the hop limit) and forwards the message to all known
  * routers and clients */
 //-----------------------------------------------------------------------------
-static void process_search (struct msg_info *mi, jsmntok_t *tok, int ntok)
+static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    struct sockaddr_storage ss;
     int hops, hop_port;
     char *msg = mi->msg;
     char v;
@@ -111,11 +97,12 @@ static void process_search (struct msg_info *mi, jsmntok_t *tok, int ntok)
     if (lport < PORT_MIN || lport > PORT_MAX)
         return;
 
-    ss = mi->addr;
-    if (ss.ss_family == AF_INET)
-        ((struct sockaddr_in*)&ss)->sin_port = (in_port_t) lport;
-    else
-        ((struct sockaddr_in6*)&ss)->sin6_port = (in_port_t) lport;
+    set_in_port ((struct sockaddr*) &mi->addr, htons ((in_port_t) lport));
+
+    // set hop-port to our listen port
+    // XXX: hop-port should be a string of length PORT_STRLEN so there is space
+    memset (msg+tok[hop_port].start, ' ', PORT_STRLEN);
+    strncpy (msg+tok[hop_port].start, udp_listen_port, udp_listen_port_strlen);
 
     flood_message (mi);
 
@@ -149,8 +136,8 @@ static void *handle_message (void *data)
     // dispatch
     if (jsmn_tokeq (msg->msg, &tok[method], "connect"))
         process_connect (msg, tok, p.toknext);
-    else if (jsmn_tokeq (msg->msg, &tok[method], "search"))
-        process_search (msg, tok, p.toknext);
+    else if (jsmn_tokeq (msg->msg, &tok[method], "broadcast"))
+        process_broadcast (msg, tok, p.toknext);
     else if (jsmn_tokeq (msg->msg, &tok[method], "ping"))
         process_ping (msg, tok, p.toknext);
     else
@@ -205,6 +192,7 @@ int main (int argc, char *argv[])
         usage ();
     }
     udp_listen_port = argv[2];
+    udp_listen_port_strlen = strlen (udp_listen_port);
 
     ctable_init ();
     router_init (udp_listen_port);

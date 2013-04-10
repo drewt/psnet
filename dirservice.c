@@ -121,8 +121,6 @@ static void process_discover (struct conn_info *info, char *args)
     if (!n || !port)
         goto bail_error;
 
-    printf ("DISCOVER %s %s\n", port, n);
-
     lport = strtol (port, &endptr, 10);
     if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0'))
         goto bail_error;

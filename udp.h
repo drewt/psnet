@@ -19,6 +19,8 @@ struct msg_info {
 int udp_threads;
 pthread_mutex_t udp_threads_lock;
 
+void udp_send_msg (const char *msg, size_t len, struct sockaddr_storage *dst);
+
 int udp_server_init (char *port);
 void __attribute((noreturn)) udp_server_main (int sockfd, int max_threads,
         void *(*cb)(void*));
