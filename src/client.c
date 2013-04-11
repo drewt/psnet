@@ -10,7 +10,7 @@
 #include "response.h"
 #include "deltalist.h"
 
-static unsigned int delta_hash (const void *client);
+static unsigned long delta_hash (const void *client);
 static bool delta_equals (const void *a,
         const void *b);
 static void delta_act (const void *client);
@@ -25,7 +25,7 @@ static struct delta_list client_table = {
     .free = free
 };
 
-static unsigned int delta_hash (const void *data)
+static unsigned long delta_hash (const void *data)
 {
     const struct sockaddr_storage *client = data;
     if (client->ss_family == AF_INET) {

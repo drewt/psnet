@@ -23,7 +23,7 @@ struct delta_list {
     struct delta_node *delta_tail; // tail of the delta list
 
     /* functions that operate on data_t */
-    unsigned int (* const hash)(const data_t*);
+    unsigned long (* const hash)(const data_t*);
     bool (* const equals)(const data_t*,const data_t*);
     void (* const act)(const data_t*);
     void (* const free)(data_t*);

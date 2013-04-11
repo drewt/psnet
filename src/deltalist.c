@@ -23,7 +23,7 @@ struct delta_node {
 static struct delta_node *get_node (struct delta_list *table,
         const data_t *data, struct delta_node **prev)
 {
-    unsigned int index;
+    unsigned long index;
     struct delta_node *it, *last;
 
     index = table->hash (data) % HT_SIZE;
@@ -46,7 +46,7 @@ static struct delta_node *get_node (struct delta_list *table,
 //-----------------------------------------------------------------------------
 static void hash_insert (struct delta_list *table, struct delta_node *node)
 {
-    unsigned int index = table->hash (node->data) % HT_SIZE;
+    unsigned long index = table->hash (node->data) % HT_SIZE;
 
     node->ht_next = table->table[index];
     table->table[index] = node;
@@ -98,7 +98,7 @@ static void dl_remove_node (struct delta_list *table, struct delta_node *node)
 //-----------------------------------------------------------------------------
 static int delta_delete (struct delta_list *table, const data_t *data)
 {
-    unsigned int index;
+    unsigned long index;
     struct delta_node *node, *prev;
 
     if (!(node = get_node (table, data, &prev)))
