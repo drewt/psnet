@@ -1,5 +1,5 @@
-#ifndef _P2P_CLIENT_H_
-#define _P2P_CLIENT_H_
+#ifndef _PSNET_CLIENT_H_
+#define _PSNET_CLIENT_H_
 
 #include <sys/socket.h>
 

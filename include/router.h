@@ -1,5 +1,5 @@
-#ifndef _P2P_ROUTER_H_
-#define _P2P_ROUTER_H_
+#ifndef _PSNET_ROUTER_H_
+#define _PSNET_ROUTER_H_
 
 #include <sys/socket.h>
 

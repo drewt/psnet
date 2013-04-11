@@ -1,5 +1,5 @@
-#ifndef _P2P_UDP_H_
-#define _P2P_UDP_H_
+#ifndef _PSNET_UDP_H_
+#define _PSNET_UDP_H_
 
 #include <sys/socket.h>
 #include <pthread.h>

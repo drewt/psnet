@@ -1,10 +1,5 @@
-/* common.h : common header
- *
- * Author: Drew Thoreson
- */
-
-#ifndef _P2P_COMMON_H_
-#define _P2P_COMMON_H_
+#ifndef _PSNET_COMMON_H_
+#define _PSNET_COMMON_H_
 
 #include <string.h>
 #include <sys/socket.h>

@@ -1,5 +1,5 @@
-#ifndef _RESPONSE_H_
-#define _RESPONSE_H_
+#ifndef _PSNET_RESPONSE_H_
+#define _PSNET_RESPONSE_H_
 
 #include <stdbool.h>
 

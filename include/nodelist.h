@@ -1,5 +1,5 @@
-#ifndef _P2P_NODELIST_H_
-#define _P2P_NODELIST_H_
+#ifndef _PSNET_NODELIST_H_
+#define _PSNET_NODELIST_H_
 
 #include <sys/socket.h>
 #ifdef P2PSERV_LOG

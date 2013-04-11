@@ -1,5 +1,5 @@
-#ifndef _P2P_DIRCLIENT_H_
-#define _P2P_DIRCLIENT_H_
+#ifndef _PSNET_DIRCLIENT_H_
+#define _PSNET_DIRCLIENT_H_
 
 struct node_list;
 
