@@ -127,8 +127,7 @@ int tcp_server_init (char *port)
 /*-----------------------------------------------------------------------------
  * The server's main accept() loop */
 //-----------------------------------------------------------------------------
-void __attribute((noreturn)) tcp_server_main (int sockfd, int max_threads,
-        void*(*cb)(void*))
+_Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*))
 {
     socklen_t sin_size;
     struct conn_info *targ;
@@ -142,7 +141,7 @@ void __attribute((noreturn)) tcp_server_main (int sockfd, int max_threads,
 
         // wait for a connection
         sin_size = sizeof (targ->addr);
-        targ->sock = accept (sockfd, (struct sockaddr*) &targ->addr, &sin_size);
+        targ->sock = accept (sock, (struct sockaddr*) &targ->addr, &sin_size);
         if (targ->sock == -1) {
             perror ("accept");
             free (targ);

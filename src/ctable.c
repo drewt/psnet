@@ -47,7 +47,7 @@ static pthread_mutex_t ctable_lock;
 /*-----------------------------------------------------------------------------
  * Clock thread: periodically calls the ctable_tick() function  */
 //-----------------------------------------------------------------------------
-static void __attribute((noreturn)) *ctable_clock_thread () {
+static _Noreturn void *ctable_clock_thread () {
     unsigned int left;
     for (;;) {
         for (left = INTERVAL_SECONDS; left; left = sleep (left));

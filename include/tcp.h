@@ -23,8 +23,7 @@ int tcp_threads;
 pthread_mutex_t tcp_threads_lock;
 
 int tcp_server_init (char *port);
-void __attribute((noreturn)) tcp_server_main (int sockfd, int max_threads,
-        void*(*cb)(void*));
+_Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*));
 
 size_t tcp_read_message (int sock, char *msg_buf);
 size_t tcp_read_bytes (int sock, char *msg_buf, size_t bytes);

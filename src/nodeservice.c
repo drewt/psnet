@@ -80,7 +80,7 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
     char *msg = mi->msg;
     char v;
     long lport;
-    
+
     if ((hops = jsmn_get_value (msg, tok, "hops")) == -1)
         return;
 
@@ -156,7 +156,7 @@ cleanup:
 /*-----------------------------------------------------------------------------
  * Usage... */
 //-----------------------------------------------------------------------------
-static void __attribute((noreturn)) usage (void)
+static _Noreturn void usage (void)
 {
     puts ("usage: infranode [nclients] [port]\n"
           "\twhere 'nclients' is the maximum number of threads\n"

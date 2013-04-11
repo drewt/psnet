@@ -86,8 +86,7 @@ int udp_server_init (char *port)
     return sockfd;
 }
 
-void __attribute((noreturn)) udp_server_main (int sockfd, int max_threads,
-        void *(*cb)(void*))
+_Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*))
 {
     struct msg_info *msg;
     socklen_t sin_size;
@@ -97,7 +96,7 @@ void __attribute((noreturn)) udp_server_main (int sockfd, int max_threads,
     for(;;) {
         msg = malloc (sizeof (struct msg_info));
         sin_size = sizeof (struct sockaddr_in);
-        if ((rc = recvfrom (sockfd, msg->msg, UDP_MSG_MAX-1, 0,
+        if ((rc = recvfrom (sock, msg->msg, UDP_MSG_MAX-1, 0,
                     (struct sockaddr*) &msg->addr, &sin_size)) == -1) {
             perror ("recvfrom");
             continue;
@@ -128,5 +127,5 @@ void __attribute((noreturn)) udp_server_main (int sockfd, int max_threads,
         else if (pthread_detach (tid))
             perror ("pthread_detach");
     }
-    close (sockfd);
+    close (sock);
 }

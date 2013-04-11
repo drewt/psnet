@@ -194,7 +194,7 @@ static void *handle_connection (void *data)
 /*-----------------------------------------------------------------------------
  * Usage... */
 //-----------------------------------------------------------------------------
-static void __attribute((noreturn)) usage (void)
+static _Noreturn void usage (void)
 {
     puts ("usage: infradir [nclients] [port]\n"
           "\twhere 'nclients' is the maximum number of clients\n"

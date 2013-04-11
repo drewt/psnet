@@ -20,7 +20,7 @@
 static struct node_list routers;
 static pthread_mutex_t routers_lock;
 
-static void __attribute((noreturn)) *router_update_thread (void *data)
+static _Noreturn void *router_update_thread (void *data)
 {
     char *port = data;
 
@@ -44,7 +44,7 @@ static void __attribute((noreturn)) *router_update_thread (void *data)
     }
 }
 
-static void __attribute((noreturn)) *router_keepalive_thread (void *data)
+static _Noreturn void *router_keepalive_thread (void *data)
 {
     int status;
     char *port = data;

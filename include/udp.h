@@ -7,7 +7,7 @@
 #include <netinet/in.h>
 #endif
 
-#define UDP_MSG_MAX 128
+#define UDP_MSG_MAX 512
 
 /* message info: source address and message */
 struct msg_info {
@@ -27,7 +27,6 @@ void udp_send_msg (const char *msg, size_t len,
         const struct sockaddr_storage *dst);
 
 int udp_server_init (char *port);
-void __attribute((noreturn)) udp_server_main (int sockfd, int max_threads,
-        void *(*cb)(void*));
+_Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*));
 
 #endif
