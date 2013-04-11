@@ -7,7 +7,7 @@ OFILES = $(BIN)/request.o $(BIN)/response.o $(BIN)/client.o $(BIN)/deltalist.o \
 	  $(BIN)/udpserver.o
 DIROFILES = $(BIN)/dirservice.o $(BIN)/tcpserver.o 
 NODEOFILES = $(BIN)/nodeservice.o $(BIN)/router.o $(BIN)/dirclient.o \
-	     $(BIN)/nodelist.o $(BIN)/jsmn.o
+	     $(BIN)/nodelist.o $(BIN)/msgcache.o $(BIN)/jsmn.o
 
 XFILES = $(BIN)/infradir $(BIN)/infranode
 
@@ -52,11 +52,11 @@ $(BIN)/router.o: $(INC)/router.h $(INC)/udp.h $(INC)/nodelist.h \
 clean:
 	rm -f $(BIN)/*
 
-dirmem: infradir
+dirmem: $(BIN)/infradir
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
 	    --num-callers=20 --track-fds=yes $(BIN)/infradir 10000 6666
 
-nodemem: infranode
+nodemem: $(BIN)/infranode
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
-	    --num-callers=20 --track-fds=yes $(BIN)/infranode 10000 6666
+	    --num-callers=20 --track-fds=yes $(BIN)/infranode 10000 5555
 

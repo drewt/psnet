@@ -86,7 +86,6 @@ int add_client (struct sockaddr_storage *addr, const char *port)
     if (make_client (client, port))
         return -1;
 
-    //delta_insert (&client_table, client);
     delta_update (&client_table, client);
     return 0;
 }

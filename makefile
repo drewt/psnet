@@ -7,11 +7,11 @@ all:
 clean:
 	rm -f $(BIN)/*
 
-dirmem: infradir
+dirmem: all
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
 	    --num-callers=20 --track-fds=yes $(BIN)/infradir 10000 6666
 
-nodemem: infranode
+nodemem: all
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
-	    --num-callers=20 --track-fds=yes $(BIN)/infranode 10000 6666
+	    --num-callers=20 --track-fds=yes $(BIN)/infranode 10000 5555
 

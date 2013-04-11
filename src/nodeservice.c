@@ -11,6 +11,7 @@
 #include "udp.h"
 #include "client.h"
 #include "router.h"
+#include "msgcache.h"
 
 #define JSMN_STRICT
 #include "jsmn.h"
@@ -19,8 +20,10 @@
 
 #define PONG_MAX (25 + PORT_STRLEN)
 
-static char *udp_listen_port;
-static size_t udp_listen_port_strlen;
+static struct {
+    char *str;
+    size_t len;
+} udp_port;
 
 /*-----------------------------------------------------------------------------
  * Process a 'ping' packet: send a pong */
@@ -75,8 +78,10 @@ static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 //-----------------------------------------------------------------------------
 static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    int hops, hop_port;
+    int hops, hop_port, id;
     char *msg = mi->msg;
+    char *msgid;
+    size_t id_len;
     char v;
     long lport;
 
@@ -84,6 +89,9 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
         return;
 
     if ((hop_port = jsmn_get_value (msg, tok, "hop-port")) == -1)
+        return;
+
+    if ((id = jsmn_get_value (msg, tok, "id")) == -1)
         return;
 
     v = msg[tok[hops].start];
@@ -95,19 +103,29 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
     if (lport < PORT_MIN || lport > PORT_MAX)
         return;
 
+    id_len = jsmn_toklen (&tok[id]);
+    msgid = malloc (id_len + 1);
+    memcpy (msgid, msg + tok[id].start, id_len);
+    msgid[id_len] = '\0';
+
+    printf ("id is: %s\n", msgid);
+    if (cache_msg (msgid)) {
+        free (msgid);
+        return;
+    }
+
     set_in_port ((struct sockaddr*) &mi->addr, htons ((in_port_t) lport));
 
     // set hop-port to our listen port
     // XXX: hop-port should be a string of length PORT_STRLEN so there is space
     memset (msg+tok[hop_port].start, ' ', PORT_STRLEN);
-    strncpy (msg+tok[hop_port].start, udp_listen_port, udp_listen_port_strlen);
+    strncpy (msg+tok[hop_port].start, udp_port.str, udp_port.len);
 
     flood_message (mi);
 
-    printf ("hops: %.*s\nhop-port: %.*s\nmsg: %s\n",
-            jsmn_toklen (&tok[hops]), msg+tok[hops].start,
-            jsmn_toklen (&tok[hop_port]), msg+tok[hop_port].start,
-            msg);
+#ifdef P2PSERV_LOG
+    printf (ANSI_YELLOW "F %s\n" ANSI_RESET, msgid);
+#endif
 }
 
 /*-----------------------------------------------------------------------------
@@ -158,8 +176,8 @@ cleanup:
 static _Noreturn void usage (void)
 {
     puts ("usage: infranode [nclients] [port]\n"
-          "\twhere 'nclients' is the maximum number of threads\n"
-          "\tand 'port' is the port number to listen on");
+          "       where 'nclients' is the maximum number of threads\n"
+          "       and 'port' is the port number to listen on");
     exit (EXIT_FAILURE);
 }
 
@@ -189,11 +207,12 @@ int main (int argc, char *argv[])
         fprintf (stderr, "error: invalid port\n");
         usage ();
     }
-    udp_listen_port = argv[2];
-    udp_listen_port_strlen = strlen (udp_listen_port);
+    udp_port.str = argv[2];
+    udp_port.len = strlen (udp_port.str);
 
     clients_init ();
-    router_init (udp_listen_port);
+    msg_cache_init ();
+    router_init (udp_port.str);
 
     sockfd = udp_server_init (argv[2]);
     udp_server_main (sockfd, max_threads, handle_message);
