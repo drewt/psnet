@@ -11,8 +11,7 @@
 #include "deltalist.h"
 
 static unsigned long delta_hash (const void *client);
-static bool delta_equals (const void *a,
-        const void *b);
+static int delta_equals (const void *a, const void *b);
 static void delta_act (const void *client);
 
 static struct delta_list client_table = {
@@ -38,7 +37,7 @@ static unsigned long delta_hash (const void *data)
     return 0;
 }
 
-static bool delta_equals (const void *a, const void *b)
+static int delta_equals (const void *a, const void *b)
 {
     return sockaddr_equals (a, b);
 }

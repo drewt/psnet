@@ -241,13 +241,13 @@ int delta_remove (struct delta_list *table, const data_t *data)
  * Returns true if the given element exists in the table, or false if it does
  * not */
 //-----------------------------------------------------------------------------
-bool delta_contains (struct delta_list *table, const data_t *data)
+int delta_contains (struct delta_list *table, const data_t *data)
 {
     pthread_mutex_lock (&table->lock);
     struct delta_node *rv = get_node (table, data, NULL);
     pthread_mutex_unlock (&table->lock);
 
-    return rv ? true : false;
+    return rv ? 1 : 0;
 }
 
 /*-----------------------------------------------------------------------------

@@ -1,8 +1,6 @@
 #ifndef _PSNET_DELTALIST_H_
 #define _PSNET_DELTALIST_H_
 
-#include <stdbool.h>
-
 #ifndef EXP_INTERVAL
 #define EXP_INTERVAL 10
 #endif
@@ -24,7 +22,7 @@ struct delta_list {
 
     /* functions that operate on data_t */
     unsigned long (* const hash)(const data_t*);
-    bool (* const equals)(const data_t*,const data_t*);
+    int (* const equals)(const data_t*,const data_t*);
     void (* const act)(const data_t*);
     void (* const free)(data_t*);
 
@@ -37,7 +35,7 @@ void delta_init (struct delta_list *table);
 void delta_insert (struct delta_list *table, const data_t *data);
 int delta_update (struct delta_list *table, const data_t *data);
 int delta_remove (struct delta_list *table, const data_t *data);
-bool delta_contains (struct delta_list *table, const data_t *data);
+int delta_contains (struct delta_list *table, const data_t *data);
 const data_t *delta_get (struct delta_list *table, const data_t *data);
 void delta_clear (struct delta_list *table);
 void delta_foreach (struct delta_list *table,
