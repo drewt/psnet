@@ -314,3 +314,16 @@ int jsmn_get_value (const char *msg, jsmntok_t *obj, const char *key)
     }
     return -1;
 }
+
+char *jsmn_tokdup (const char *msg, jsmntok_t *tok)
+{
+    size_t len;
+    char *dup;
+
+    len = jsmn_toklen (tok);
+    dup = malloc (len + 1);
+    memcpy (dup, msg + tok->start, len);
+    dup[len] = '\0';
+
+    return dup;
+}

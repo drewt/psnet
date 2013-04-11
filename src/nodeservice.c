@@ -81,7 +81,6 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
     int hops, hop_port, id;
     char *msg = mi->msg;
     char *msgid;
-    size_t id_len;
     char v;
     long lport;
 
@@ -103,12 +102,7 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
     if (lport < PORT_MIN || lport > PORT_MAX)
         return;
 
-    id_len = jsmn_toklen (&tok[id]);
-    msgid = malloc (id_len + 1);
-    memcpy (msgid, msg + tok[id].start, id_len);
-    msgid[id_len] = '\0';
-
-    printf ("id is: %s\n", msgid);
+    msgid = jsmn_tokdup (msg, &tok[id]);
     if (cache_msg (msgid)) {
         free (msgid);
         return;
