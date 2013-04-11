@@ -141,11 +141,12 @@ static int send_command (char **dest, const char *cmd, char *host, char *port,
         goto cleanup;
     }
 
-    *dest = malloc (size);
+    *dest = malloc (size+1);
     if ((rv = tcp_read_bytes (sockfd, *dest, size)) == -1)
         fprintf (stderr, "send_command: failed to read message body\n");
     else if ((size_t) rv < size)
         fprintf (stderr, "directory sent fewer than expected bytes\n");
+    (*dest)[rv] = '\0';
 
 cleanup:
     close (sockfd);
