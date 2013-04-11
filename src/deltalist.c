@@ -4,160 +4,140 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#include "ctable.h"
+#include "deltalist.h"
 
-static void ctable_tick ();
-static int ctable_remove_internal (const data_t *data);
+static void delta_tick ();
+static int dl_remove_internal (struct delta_list *table, const data_t *data);
 
-struct ct_node {
+struct delta_node {
     const data_t *data;
     unsigned int delta;      // delta for delta list
-    struct ct_node *ht_next; // hash table next pointer
-    struct ct_node *dl_next; // delta list next pointer
-    struct ct_node *dl_prev; // delta list prev pointer
+    struct delta_node *ht_next; // hash table next pointer
+    struct delta_node *dl_next; // delta list next pointer
+    struct delta_node *dl_prev; // delta list prev pointer
 };
-
-/* metadata structure */
-static struct {
-    unsigned int delta;         // sum of all individual deltas
-    struct ct_node *delta_head; // head of the delta list
-    struct ct_node *delta_tail; // tail of the delta list
-
-    /* functions that operate on data_t */
-    unsigned int (* const hash)(const data_t*);
-    bool (* const equals)(const data_t*,const data_t*);
-    void (* const act)(const data_t*);
-    void (* const free)(data_t*);
-
-    struct ct_node *table[HT_SIZE]; // memory for the hash table
-} hash_table = {
-    .delta = 0,
-    .delta_head = NULL,
-    .delta_tail = NULL,
-    .hash = ctable_hash,
-    .equals = ctable_equals,
-    .act = ctable_act,
-    .free = ctable_free
-};
-
-/* XXX: global mutex to protect data structure;
- * consider replacing with read-write lock */
-static pthread_mutex_t ctable_lock;
 
 /*-----------------------------------------------------------------------------
- * Clock thread: periodically calls the ctable_tick() function  */
+ * Clock thread: periodically calls the delta_tick() function  */
 //-----------------------------------------------------------------------------
-static _Noreturn void *ctable_clock_thread () {
+static _Noreturn void *clock_thread (void *data)
+{
+    struct delta_list *table = data;
     unsigned int left;
     for (;;) {
         for (left = INTERVAL_SECONDS; left; left = sleep (left));
-        ctable_tick ();
+        delta_tick (table);
     }
 }
 
 /*-----------------------------------------------------------------------------
- * Initializes the ctable */
+ * Initializes the delta list */
 //-----------------------------------------------------------------------------
-void ctable_init (void) {
+void delta_init (struct delta_list *table)
+{
     pthread_t tid;
 
-    if (pthread_mutex_init (&ctable_lock, NULL))
+    if (pthread_mutex_init (&table->lock, NULL))
         perror ("pthread_mutex_init");
-    if (pthread_create (&tid, NULL, ctable_clock_thread, NULL))
+    if (pthread_create (&tid, NULL, clock_thread, table))
         perror ("pthread_create");
 }
 
 /*-----------------------------------------------------------------------------
  * Increases "time" by one tick */
 //-----------------------------------------------------------------------------
-static void ctable_tick () {
+static void delta_tick (struct delta_list *table)
+{
     data_t *tmp_data;
 
-    pthread_mutex_lock (&ctable_lock);
+    pthread_mutex_lock (&table->lock);
 
-    if (!hash_table.delta_head) {
-        pthread_mutex_unlock (&ctable_lock);
+    if (!table->delta_head) {
+        pthread_mutex_unlock (&table->lock);
         return;
     }
 
-    hash_table.delta--;
-    hash_table.delta_head->delta--;
+    table->delta--;
+    table->delta_head->delta--;
 
     // remove any expired elements
-    while (hash_table.delta_head && !hash_table.delta_head->delta) {
-        tmp_data = (data_t*) hash_table.delta_head->data;
+    while (table->delta_head && !table->delta_head->delta) {
+        tmp_data = (data_t*) table->delta_head->data;
 
-        hash_table.act (tmp_data);
+        table->act (tmp_data);
 
-        ctable_remove_internal (tmp_data);
+        dl_remove_internal (table, tmp_data);
     }
-    pthread_mutex_unlock (&ctable_lock);
+    pthread_mutex_unlock (&table->lock);
 }
 
 /*-----------------------------------------------------------------------------
  * Inserts a node into a bucket in the hash table */
 //-----------------------------------------------------------------------------
-static void hash_insert (struct ct_node *node) {
-    unsigned int index = hash_table.hash (node->data) % HT_SIZE;
+static void hash_insert (struct delta_list *table, struct delta_node *node)
+{
+    unsigned int index = table->hash (node->data) % HT_SIZE;
 
-    node->ht_next = hash_table.table[index];
-    hash_table.table[index] = node;
+    node->ht_next = table->table[index];
+    table->table[index] = node;
 }
 
 /*-----------------------------------------------------------------------------
  * Inserts a node into the delta list */
 //-----------------------------------------------------------------------------
-static void delta_insert (struct ct_node *node) {
-
+static void dl_insert (struct delta_list *table, struct delta_node *node)
+{
     node->delta = EXP_INTERVAL;
 
-    if (!hash_table.delta_head) {
-        hash_table.delta_head = hash_table.delta_tail = node;
+    if (!table->delta_head) {
+        table->delta_head = table->delta_tail = node;
         node->dl_prev = NULL;
     } else {
-        node->delta -= hash_table.delta;
+        node->delta -= table->delta;
 
-        hash_table.delta_tail->dl_next = node;
-        node->dl_prev = hash_table.delta_tail;
-        hash_table.delta_tail = node;
+        table->delta_tail->dl_next = node;
+        node->dl_prev = table->delta_tail;
+        table->delta_tail = node;
     }
     node->dl_next = NULL;
 
-    hash_table.delta = EXP_INTERVAL;
+    table->delta = EXP_INTERVAL;
 }
 
 /*-----------------------------------------------------------------------------
  * Inserts an element into the table */
 //-----------------------------------------------------------------------------
-void ctable_insert (const data_t *data) {
-    struct ct_node *node;
+void delta_insert (struct delta_list *table, const data_t *data)
+{
+    struct delta_node *node;
 
-    node = malloc (sizeof (struct ct_node));
+    node = malloc (sizeof (struct delta_node));
     node->data = data;
 
-    pthread_mutex_lock (&ctable_lock);
-    ctable_remove_internal (data);
-    hash_insert (node);
-    delta_insert (node);
-    pthread_mutex_unlock (&ctable_lock);
+    pthread_mutex_lock (&table->lock);
+    dl_remove_internal (table, data);
+    hash_insert (table, node);
+    dl_insert (table, node);
+    pthread_mutex_unlock (&table->lock);
 }
 
 /*-----------------------------------------------------------------------------
- * Finds the struct dh_node associated with a given element, if that element
+ * Finds the struct delta_node associated with a given element, if that element
  * exists in the table.  If the element does not exist, NULL is returned. If
  * `prev' is not NULL, then prev will be set to the previous element in the
  * hash table bucket when this function returns */
 //-----------------------------------------------------------------------------
-static struct ct_node *get_node (const data_t *data, struct ct_node **prev) {
-
+static struct delta_node *get_node (struct delta_list *table, const data_t *data,
+        struct delta_node **prev)
+{
     unsigned int index;
-    struct ct_node *it, *last;
+    struct delta_node *it, *last;
 
-    index = hash_table.hash (data) % HT_SIZE;
+    index = table->hash (data) % HT_SIZE;
 
     last = NULL;
-    for (it = hash_table.table[index]; it; it = it->ht_next) {
-        if (hash_table.equals (it->data, data))
+    for (it = table->table[index]; it; it = it->ht_next) {
+        if (table->equals (it->data, data))
             break;
         last = it;
     }
@@ -172,19 +152,20 @@ static struct ct_node *get_node (const data_t *data, struct ct_node **prev) {
  * Removes an element from the table.  Returns 0 on success, or -1 if the given
  * element is not in the table */
 //-----------------------------------------------------------------------------
-static int ctable_remove_internal (const data_t *data) {
+static int dl_remove_internal (struct delta_list *table, const data_t *data)
+{
     unsigned int index;
-    struct ct_node *node, *prev;
+    struct delta_node *node, *prev;
 
-    if (!(node = get_node (data, &prev)))
+    if (!(node = get_node (table, data, &prev)))
         return -1;
 
     // remove from hash table
     if (prev) {
         prev->ht_next = node->ht_next;
     } else {
-        index = hash_table.hash (data) % HT_SIZE;
-        hash_table.table[index] = node->ht_next;
+        index = table->hash (data) % HT_SIZE;
+        table->table[index] = node->ht_next;
     }
 
     // remove from delta list
@@ -192,29 +173,30 @@ static int ctable_remove_internal (const data_t *data) {
         node->dl_next->delta += node->delta;
         node->dl_next->dl_prev = node->dl_prev;
     } else {
-        hash_table.delta -= node->delta;
+        table->delta -= node->delta;
     }
 
     if (node->dl_prev)
         node->dl_prev->dl_next = node->dl_next;
     else
-        hash_table.delta_head = node->dl_next;
+        table->delta_head = node->dl_next;
 
-    hash_table.free ((data_t*)node->data);
+    table->free ((data_t*)node->data);
     free (node);
 
     return 0;
 }
 
 /*-----------------------------------------------------------------------------
- * Thread-safe interface to ctable_remove_internal() */
+ * Thread-safe interface to dl_remove_internal() */
 //-----------------------------------------------------------------------------
-int ctable_remove (const data_t *data) {
+int delta_remove (struct delta_list *table, const data_t *data)
+{
     int rc;
 
-    pthread_mutex_lock (&ctable_lock);
-    rc = ctable_remove_internal (data);
-    pthread_mutex_unlock (&ctable_lock);
+    pthread_mutex_lock (&table->lock);
+    rc = dl_remove_internal (table, data);
+    pthread_mutex_unlock (&table->lock);
 
     return rc;
 }
@@ -223,10 +205,11 @@ int ctable_remove (const data_t *data) {
  * Returns true if the given element exists in the table, or false if it does
  * not */
 //-----------------------------------------------------------------------------
-bool ctable_contains (const data_t *data) {
-    pthread_mutex_lock (&ctable_lock);
-    struct ct_node *rv = get_node (data, NULL);
-    pthread_mutex_unlock (&ctable_lock);
+bool delta_contains (struct delta_list *table, const data_t *data)
+{
+    pthread_mutex_lock (&table->lock);
+    struct delta_node *rv = get_node (table, data, NULL);
+    pthread_mutex_unlock (&table->lock);
 
     return rv ? true : false;
 }
@@ -236,12 +219,13 @@ bool ctable_contains (const data_t *data) {
  * defined by the function dh_equals) if such an element exists.  Otherwise
  * returns NULL */
 //-----------------------------------------------------------------------------
-const data_t *ctable_get (const data_t *data) {
-    struct ct_node *node;
+const data_t *delta_get (struct delta_list *table, const data_t *data)
+{
+    struct delta_node *node;
 
-    pthread_mutex_lock (&ctable_lock);
-    node = get_node (data, NULL);
-    pthread_mutex_unlock (&ctable_lock);
+    pthread_mutex_lock (&table->lock);
+    node = get_node (table, data, NULL);
+    pthread_mutex_unlock (&table->lock);
 
     return node ? node->data : NULL;
 }
@@ -249,39 +233,42 @@ const data_t *ctable_get (const data_t *data) {
 /*-----------------------------------------------------------------------------
  * Empties the table */
 //-----------------------------------------------------------------------------
-void ctable_clear (void) {
-    struct ct_node *it, *tmp;
+void delta_clear (struct delta_list *table)
+{
+    struct delta_node *it, *tmp;
 
-    pthread_mutex_lock (&ctable_lock);
+    pthread_mutex_lock (&table->lock);
 
-    it = hash_table.delta_head;
+    it = table->delta_head;
     while (it) {
         tmp = it;
         it = it->dl_next;
         free (tmp);
     }
 
-    hash_table.delta = 0;
-    hash_table.delta_head = NULL;
-    hash_table.delta_tail = NULL;
+    table->delta = 0;
+    table->delta_head = NULL;
+    table->delta_tail = NULL;
 
     for (int i = 0; i < HT_SIZE; i++)
-        hash_table.table[i] = NULL;
+        table->table[i] = NULL;
 
-    pthread_mutex_unlock (&ctable_lock);
+    pthread_mutex_unlock (&table->lock);
 }
 
 /*-----------------------------------------------------------------------------
  * Calls the function `fun' on each element in the list.  A non-zero return
  * value from `fun' is taken to indicate that iteration should cease */
 //-----------------------------------------------------------------------------
-void ctable_foreach (int (*fun)(const data_t *it, void *arg), void *arg) {
-    struct ct_node *it;
+void delta_foreach (struct delta_list *table,
+        int (*fun)(const data_t *it, void *arg), void *arg)
+{
+    struct delta_node *it;
 
-    pthread_mutex_lock (&ctable_lock);
-    for (it = hash_table.delta_head; it; it = it->dl_next) {
+    pthread_mutex_lock (&table->lock);
+    for (it = table->delta_head; it; it = it->dl_next) {
         if (fun (it->data, arg))
             break;
     }
-    pthread_mutex_unlock (&ctable_lock);
+    pthread_mutex_unlock (&table->lock);
 }

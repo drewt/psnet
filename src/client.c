@@ -6,10 +6,27 @@
 
 #include "common.h"
 #include "client.h"
+#include "udp.h"
 #include "response.h"
-#include "ctable.h"
+#include "deltalist.h"
 
-unsigned int ctable_hash (const struct sockaddr_storage *client)
+static unsigned int delta_hash (const struct sockaddr_storage *client);
+static bool delta_equals (const struct sockaddr_storage *a,
+        const struct sockaddr_storage *b);
+static void delta_act (const struct sockaddr_storage *client);
+static void delta_free (struct sockaddr_storage *client);
+
+static struct delta_list client_table = {
+    .delta = 0,
+    .delta_head = NULL,
+    .delta_tail = NULL,
+    .hash = delta_hash,
+    .equals = delta_equals,
+    .act = delta_act,
+    .free = delta_free
+};
+
+static unsigned int delta_hash (const struct sockaddr_storage *client)
 {
     if (client->ss_family == AF_INET) {
         struct sockaddr_in *c4 = (struct sockaddr_in*) client;
@@ -21,14 +38,14 @@ unsigned int ctable_hash (const struct sockaddr_storage *client)
     return 0;
 }
 
-bool ctable_equals (const struct sockaddr_storage *a,
+static bool delta_equals (const struct sockaddr_storage *a,
         const struct sockaddr_storage *b)
 {
     return sockaddr_equals ((const struct sockaddr*) a,
             (const struct sockaddr*) b);
 }
 
-void ctable_act (const struct sockaddr_storage *client)
+static void delta_act (const struct sockaddr_storage *client)
 {
 #ifdef P2PSERV_LOG
     char addr[INET6_ADDRSTRLEN];
@@ -40,9 +57,14 @@ void ctable_act (const struct sockaddr_storage *client)
 #endif
 }
 
-void ctable_free (struct sockaddr_storage *client)
+static void delta_free (struct sockaddr_storage *client)
 {
     free (client);
+}
+
+void clients_init (void)
+{
+    delta_init (&client_table);
 }
 
 static int make_client (struct sockaddr_storage *addr, const char *port)
@@ -71,7 +93,7 @@ int add_client (struct sockaddr_storage *addr, const char *port)
     if (make_client (client, port))
         return -1;
 
-    ctable_insert (client);
+    delta_insert (&client_table, client);
     return 0;
 }
 
@@ -85,7 +107,7 @@ int remove_client (struct sockaddr_storage *addr, const char *port)
     if (make_client (&client, port))
         return -1;
 
-    if (ctable_remove (&client))
+    if (delta_remove (&client_table, &client))
         return -1;
     return 0;
 }
@@ -107,7 +129,7 @@ static int make_list (const struct sockaddr_storage *client, void *data)
     struct make_list_arg *arg = data;
     if (arg->i >= arg->n)
         return 1;
-    if (arg->ignore && ctable_equals (client, arg->ignore))
+    if (arg->ignore && delta_equals (client, arg->ignore))
         return 0;
     arg->i++;
 
@@ -165,7 +187,7 @@ int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
     arg.prev->next = NULL;
     head = arg.prev;
 
-    ctable_foreach (make_list, &arg);
+    delta_foreach (&client_table, make_list, &arg);
 
     if (arg.prev != head)
         arg.prev->size--; // ignore trailing separator
@@ -179,5 +201,18 @@ int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
     arg.prev->next->next = NULL;
 
     *dest = head;
+    return CL_OK;
+}
+
+static int fwd_to_client (const struct sockaddr_storage *client, void *arg)
+{
+    struct msg_info *mi = arg;
+    udp_send_msg (mi->msg, mi->len, client);
+    return 0;
+}
+
+int flood_to_clients (struct msg_info *mi)
+{
+    delta_foreach (&client_table, fwd_to_client, mi);
     return CL_OK;
 }

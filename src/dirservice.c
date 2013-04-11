@@ -18,7 +18,6 @@
 #include "tcp.h"
 #include "response.h"
 #include "client.h"
-#include "ctable.h"
 
 #define REQ_DELIM " \t\r\n"
 
@@ -125,7 +124,7 @@ static void process_discover (struct conn_info *info, char *args)
     if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0'))
         goto bail_error;
 
-    set_in_port ((struct sockaddr*)&info->addr, (in_port_t) lport);
+    set_in_port ((struct sockaddr*)&info->addr, htons ((in_port_t) lport));
     if (clients_to_json (&jlist, &info->addr, n))
         goto bail_error;
 
@@ -231,7 +230,7 @@ int main (int argc, char *argv[])
     daemonize ();
 #endif
 
-    ctable_init ();
+    clients_init ();
     sockfd = tcp_server_init (argv[2]);
 
     tcp_server_main (sockfd, max_threads, handle_connection);

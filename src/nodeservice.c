@@ -9,7 +9,6 @@
 
 #include "common.h"
 #include "udp.h"
-#include "ctable.h"
 #include "client.h"
 #include "router.h"
 
@@ -193,7 +192,7 @@ int main (int argc, char *argv[])
     udp_listen_port = argv[2];
     udp_listen_port_strlen = strlen (udp_listen_port);
 
-    ctable_init ();
+    clients_init ();
     router_init (udp_listen_port);
 
     sockfd = udp_server_init (argv[2]);

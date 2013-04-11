@@ -3,10 +3,11 @@ DEFINES = -DEXP_INTERVAL=10 -DINTERVAL_SECONDS=1 -DP2PSERV_LOG
 CFLAGS  = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g -pthread \
 	  -I $(INC) $(DEFINES)
 
-OFILES = $(BIN)/request.o $(BIN)/response.o $(BIN)/client.o $(BIN)/ctable.o
+OFILES = $(BIN)/request.o $(BIN)/response.o $(BIN)/client.o $(BIN)/deltalist.o \
+	  $(BIN)/udpserver.o
 DIROFILES = $(BIN)/dirservice.o $(BIN)/tcpserver.o 
-NODEOFILES = $(BIN)/nodeservice.o $(BIN)/udpserver.o $(BIN)/router.o \
-	     $(BIN)/dirclient.o $(BIN)/nodelist.o $(BIN)/jsmn.o
+NODEOFILES = $(BIN)/nodeservice.o $(BIN)/router.o $(BIN)/dirclient.o \
+	     $(BIN)/nodelist.o $(BIN)/jsmn.o
 
 XFILES = $(BIN)/infradir $(BIN)/infranode
 
@@ -31,19 +32,21 @@ $(BIN)/tcpserver.o: $(INC)/tcp.h
 $(BIN)/udpserver.o: $(INC)/udp.h
 $(BIN)/request.o: $(INC)/tcp.h
 $(BIN)/response.o: $(INC)/response.h
-$(BIN)/ctable.o: $(INC)/ctable.h
-$(BIN)/client.o: $(INC)/client.h $(INC)/response.h $(INC)/ctable.h
+$(BIN)/deltalist.o: $(INC)/deltalist.h
+$(BIN)/client.o: $(INC)/client.h $(INC)/response.h $(INC)/deltalist.h \
+    $(INC)/udp.h
 $(BIN)/jsmn.o: $(INC)/jsmn.h
 
 # directory
-$(BIN)/dirservice.o: $(INC)/tcp.h $(INC)/response.h $(INC)/client.h $(INC)/ctable.h
+$(BIN)/dirservice.o: $(INC)/tcp.h $(INC)/response.h $(INC)/client.h
 
 # router
-$(BIN)/nodeservice.o: $(INC)/udp.h $(INC)/ctable.h $(INC)/client.h $(INC)/router.h \
+$(BIN)/nodeservice.o: $(INC)/udp.h $(INC)/client.h $(INC)/router.h \
     $(INC)/jsmn.h
-$(BIN)/dirclient.o: $(INC)/dirclient.h $(INC)/nodelist.h $(INC)/tcp.h $(INC)/jsmn.h
+$(BIN)/dirclient.o: $(INC)/dirclient.h $(INC)/nodelist.h $(INC)/tcp.h \
+    $(INC)/jsmn.h
 $(BIN)/nodelist.o: $(INC)/nodelist.h $(INC)/jsmn.h
-$(BIN)/router.o: $(INC)/router.h $(INC)/udp.h $(INC)/ctable.h $(INC)/nodelist.h \
+$(BIN)/router.o: $(INC)/router.h $(INC)/udp.h $(INC)/nodelist.h \
     $(INC)/dirclient.h
 
 clean:
