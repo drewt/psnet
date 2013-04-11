@@ -6,16 +6,148 @@
 
 #include "deltalist.h"
 
-static void delta_tick ();
-static int dl_remove_internal (struct delta_list *table, const data_t *data);
-
 struct delta_node {
     const data_t *data;
-    unsigned int delta;      // delta for delta list
+    unsigned int delta;         // delta for delta list
     struct delta_node *ht_next; // hash table next pointer
     struct delta_node *dl_next; // delta list next pointer
     struct delta_node *dl_prev; // delta list prev pointer
 };
+
+/*-----------------------------------------------------------------------------
+ * Finds the struct delta_node associated with a given element, if that element
+ * exists in the table.  If the element does not exist, NULL is returned. If
+ * `prev' is not NULL, then prev will be set to the previous element in the
+ * hash table bucket when this function returns */
+//-----------------------------------------------------------------------------
+static struct delta_node *get_node (struct delta_list *table,
+        const data_t *data, struct delta_node **prev)
+{
+    unsigned int index;
+    struct delta_node *it, *last;
+
+    index = table->hash (data) % HT_SIZE;
+
+    last = NULL;
+    for (it = table->table[index]; it; it = it->ht_next) {
+        if (table->equals (it->data, data))
+            break;
+        last = it;
+    }
+
+    if (prev)
+        *prev = last; // NULL if data was bucket head
+
+    return it;
+}
+
+/*-----------------------------------------------------------------------------
+ * Inserts a node into a bucket in the hash table */
+//-----------------------------------------------------------------------------
+static void hash_insert (struct delta_list *table, struct delta_node *node)
+{
+    unsigned int index = table->hash (node->data) % HT_SIZE;
+
+    node->ht_next = table->table[index];
+    table->table[index] = node;
+}
+
+/*-----------------------------------------------------------------------------
+ * Inserts a node into the delta list */
+//-----------------------------------------------------------------------------
+static void dl_insert_node (struct delta_list *table, struct delta_node *node)
+{
+    node->delta = EXP_INTERVAL;
+
+    if (!table->delta_head) {
+        table->delta_head = table->delta_tail = node;
+        node->dl_prev = NULL;
+    } else {
+        node->delta -= table->delta;
+
+        table->delta_tail->dl_next = node;
+        node->dl_prev = table->delta_tail;
+        table->delta_tail = node;
+    }
+    node->dl_next = NULL;
+
+    table->delta = EXP_INTERVAL;
+}
+
+/*-----------------------------------------------------------------------------
+ * Removes a node from the main linked list (but not the hash table) */
+//-----------------------------------------------------------------------------
+static void dl_remove_node (struct delta_list *table, struct delta_node *node)
+{
+    if (node->dl_next) {
+        node->dl_next->delta += node->delta;
+        node->dl_next->dl_prev = node->dl_prev;
+    } else {
+        table->delta -= node->delta;
+    }
+
+    if (node->dl_prev)
+        node->dl_prev->dl_next = node->dl_next;
+    else
+        table->delta_head = node->dl_next;
+}
+
+/*-----------------------------------------------------------------------------
+ * Removes an element from the table.  Returns 0 on success, or -1 if the given
+ * element is not in the table */
+//-----------------------------------------------------------------------------
+static int delta_delete (struct delta_list *table, const data_t *data)
+{
+    unsigned int index;
+    struct delta_node *node, *prev;
+
+    if (!(node = get_node (table, data, &prev)))
+        return -1;
+
+    // remove from hash table
+    if (prev) {
+        prev->ht_next = node->ht_next;
+    } else {
+        index = table->hash (data) % HT_SIZE;
+        table->table[index] = node->ht_next;
+    }
+
+    // remove from delta list
+    dl_remove_node (table, node);
+
+    table->free ((data_t*)node->data);
+    free (node);
+
+    return 0;
+}
+
+/*-----------------------------------------------------------------------------
+ * Increases "time" by one tick */
+//-----------------------------------------------------------------------------
+static void delta_tick (struct delta_list *table)
+{
+    data_t *tmp_data;
+
+    pthread_mutex_lock (&table->lock);
+
+    if (!table->delta_head) {
+        pthread_mutex_unlock (&table->lock);
+        return;
+    }
+
+    table->delta--;
+    table->delta_head->delta--;
+
+    // remove any expired elements
+    while (table->delta_head && !table->delta_head->delta) {
+        tmp_data = (data_t*) table->delta_head->data;
+
+        table->act (tmp_data);
+
+        delta_delete (table, tmp_data);
+    }
+    pthread_mutex_unlock (&table->lock);
+}
 
 /*-----------------------------------------------------------------------------
  * Clock thread: periodically calls the delta_tick() function  */
@@ -44,158 +176,62 @@ void delta_init (struct delta_list *table)
 }
 
 /*-----------------------------------------------------------------------------
- * Increases "time" by one tick */
-//-----------------------------------------------------------------------------
-static void delta_tick (struct delta_list *table)
-{
-    data_t *tmp_data;
-
-    pthread_mutex_lock (&table->lock);
-
-    if (!table->delta_head) {
-        pthread_mutex_unlock (&table->lock);
-        return;
-    }
-
-    table->delta--;
-    table->delta_head->delta--;
-
-    // remove any expired elements
-    while (table->delta_head && !table->delta_head->delta) {
-        tmp_data = (data_t*) table->delta_head->data;
-
-        table->act (tmp_data);
-
-        dl_remove_internal (table, tmp_data);
-    }
-    pthread_mutex_unlock (&table->lock);
-}
-
-/*-----------------------------------------------------------------------------
- * Inserts a node into a bucket in the hash table */
-//-----------------------------------------------------------------------------
-static void hash_insert (struct delta_list *table, struct delta_node *node)
-{
-    unsigned int index = table->hash (node->data) % HT_SIZE;
-
-    node->ht_next = table->table[index];
-    table->table[index] = node;
-}
-
-/*-----------------------------------------------------------------------------
- * Inserts a node into the delta list */
-//-----------------------------------------------------------------------------
-static void dl_insert (struct delta_list *table, struct delta_node *node)
-{
-    node->delta = EXP_INTERVAL;
-
-    if (!table->delta_head) {
-        table->delta_head = table->delta_tail = node;
-        node->dl_prev = NULL;
-    } else {
-        node->delta -= table->delta;
-
-        table->delta_tail->dl_next = node;
-        node->dl_prev = table->delta_tail;
-        table->delta_tail = node;
-    }
-    node->dl_next = NULL;
-
-    table->delta = EXP_INTERVAL;
-}
-
-/*-----------------------------------------------------------------------------
- * Inserts an element into the table */
+ * Inserts an element into the list IFF an element corresponding to the
+ * argument isn't already in the list */
 //-----------------------------------------------------------------------------
 void delta_insert (struct delta_list *table, const data_t *data)
 {
-    struct delta_node *node;
-
-    node = malloc (sizeof (struct delta_node));
-    node->data = data;
+    struct delta_node *node, *prev;
 
     pthread_mutex_lock (&table->lock);
-    dl_remove_internal (table, data);
-    hash_insert (table, node);
-    dl_insert (table, node);
+
+    if (!(node = get_node (table, data, &prev))) {
+        node = malloc (sizeof (struct delta_node));
+        node->data = data;
+        hash_insert (table, node);
+        dl_insert_node (table, node);
+    }
+
     pthread_mutex_unlock (&table->lock);
 }
 
 /*-----------------------------------------------------------------------------
- * Finds the struct delta_node associated with a given element, if that element
- * exists in the table.  If the element does not exist, NULL is returned. If
- * `prev' is not NULL, then prev will be set to the previous element in the
- * hash table bucket when this function returns */
+ * Relocates a node to the end of the list if the data corresponding to the
+ * argument is already in the list; otherwise allocates a new node and puts it
+ * at the end of the list */
 //-----------------------------------------------------------------------------
-static struct delta_node *get_node (struct delta_list *table, const data_t *data,
-        struct delta_node **prev)
+int delta_update (struct delta_list *table, const data_t *data)
 {
-    unsigned int index;
-    struct delta_node *it, *last;
-
-    index = table->hash (data) % HT_SIZE;
-
-    last = NULL;
-    for (it = table->table[index]; it; it = it->ht_next) {
-        if (table->equals (it->data, data))
-            break;
-        last = it;
-    }
-
-    if (prev)
-        *prev = last; // NULL if data was bucket head
-
-    return it;
-}
-
-/*-----------------------------------------------------------------------------
- * Removes an element from the table.  Returns 0 on success, or -1 if the given
- * element is not in the table */
-//-----------------------------------------------------------------------------
-static int dl_remove_internal (struct delta_list *table, const data_t *data)
-{
-    unsigned int index;
     struct delta_node *node, *prev;
+    int rc;
 
-    if (!(node = get_node (table, data, &prev)))
-        return -1;
+    pthread_mutex_lock (&table->lock);
 
-    // remove from hash table
-    if (prev) {
-        prev->ht_next = node->ht_next;
+    if ((node = get_node (table, data, &prev))) {
+        dl_remove_node (table, node);
+        rc = 1;
     } else {
-        index = table->hash (data) % HT_SIZE;
-        table->table[index] = node->ht_next;
+        node = malloc (sizeof (struct delta_node));
+        node->data = data;
+        hash_insert (table, node);
+        rc = 0;
     }
+    dl_insert_node (table, node);
 
-    // remove from delta list
-    if (node->dl_next) {
-        node->dl_next->delta += node->delta;
-        node->dl_next->dl_prev = node->dl_prev;
-    } else {
-        table->delta -= node->delta;
-    }
+    pthread_mutex_unlock (&table->lock);
 
-    if (node->dl_prev)
-        node->dl_prev->dl_next = node->dl_next;
-    else
-        table->delta_head = node->dl_next;
-
-    table->free ((data_t*)node->data);
-    free (node);
-
-    return 0;
+    return rc;
 }
 
 /*-----------------------------------------------------------------------------
- * Thread-safe interface to dl_remove_internal() */
+ * Thread-safe interface to delta_delete() */
 //-----------------------------------------------------------------------------
 int delta_remove (struct delta_list *table, const data_t *data)
 {
     int rc;
 
     pthread_mutex_lock (&table->lock);
-    rc = dl_remove_internal (table, data);
+    rc = delta_delete (table, data);
     pthread_mutex_unlock (&table->lock);
 
     return rc;

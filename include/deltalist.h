@@ -15,7 +15,7 @@
 #define HT_SIZE 10
 #endif
 
-typedef struct sockaddr_storage data_t;
+typedef void data_t;
 
 struct delta_list {
     unsigned int delta;            // sum of all individual deltas
@@ -35,6 +35,7 @@ struct delta_list {
 
 void delta_init (struct delta_list *table);
 void delta_insert (struct delta_list *table, const data_t *data);
+int delta_update (struct delta_list *table, const data_t *data);
 int delta_remove (struct delta_list *table, const data_t *data);
 bool delta_contains (struct delta_list *table, const data_t *data);
 const data_t *delta_get (struct delta_list *table, const data_t *data);

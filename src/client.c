@@ -10,11 +10,10 @@
 #include "response.h"
 #include "deltalist.h"
 
-static unsigned int delta_hash (const struct sockaddr_storage *client);
-static bool delta_equals (const struct sockaddr_storage *a,
-        const struct sockaddr_storage *b);
-static void delta_act (const struct sockaddr_storage *client);
-static void delta_free (struct sockaddr_storage *client);
+static unsigned int delta_hash (const void *client);
+static bool delta_equals (const void *a,
+        const void *b);
+static void delta_act (const void *client);
 
 static struct delta_list client_table = {
     .delta = 0,
@@ -23,11 +22,12 @@ static struct delta_list client_table = {
     .hash = delta_hash,
     .equals = delta_equals,
     .act = delta_act,
-    .free = delta_free
+    .free = free
 };
 
-static unsigned int delta_hash (const struct sockaddr_storage *client)
+static unsigned int delta_hash (const void *data)
 {
+    const struct sockaddr_storage *client = data;
     if (client->ss_family == AF_INET) {
         struct sockaddr_in *c4 = (struct sockaddr_in*) client;
         return c4->sin_addr.s_addr + c4->sin_port;
@@ -38,16 +38,15 @@ static unsigned int delta_hash (const struct sockaddr_storage *client)
     return 0;
 }
 
-static bool delta_equals (const struct sockaddr_storage *a,
-        const struct sockaddr_storage *b)
+static bool delta_equals (const void *a, const void *b)
 {
-    return sockaddr_equals ((const struct sockaddr*) a,
-            (const struct sockaddr*) b);
+    return sockaddr_equals (a, b);
 }
 
-static void delta_act (const struct sockaddr_storage *client)
+static void delta_act (const void *data)
 {
 #ifdef P2PSERV_LOG
+    const struct sockaddr_storage *client = data;
     char addr[INET6_ADDRSTRLEN];
     inet_ntop (client->ss_family, get_in_addr ((struct sockaddr*) client),
             addr, sizeof addr);
@@ -55,11 +54,6 @@ static void delta_act (const struct sockaddr_storage *client)
             ntohs (get_in_port ((struct sockaddr*) client)));
     fflush (stdout);
 #endif
-}
-
-static void delta_free (struct sockaddr_storage *client)
-{
-    free (client);
 }
 
 void clients_init (void)
@@ -93,7 +87,8 @@ int add_client (struct sockaddr_storage *addr, const char *port)
     if (make_client (client, port))
         return -1;
 
-    delta_insert (&client_table, client);
+    //delta_insert (&client_table, client);
+    delta_update (&client_table, client);
     return 0;
 }
 
@@ -124,14 +119,15 @@ struct make_list_arg {
  * Constructs a JSON representation of the given client structure and inserts
  * it into the list given in the argument */
 //-----------------------------------------------------------------------------
-static int make_list (const struct sockaddr_storage *client, void *data)
+static int make_list (const void *data, void *arg)
 {
-    struct make_list_arg *arg = data;
-    if (arg->i >= arg->n)
+    const struct sockaddr_storage *client = data;
+    struct make_list_arg *ml_arg = arg;
+    if (ml_arg->i >= ml_arg->n)
         return 1;
-    if (arg->ignore && delta_equals (client, arg->ignore))
+    if (ml_arg->ignore && delta_equals (client, ml_arg->ignore))
         return 0;
-    arg->i++;
+    ml_arg->i++;
 
     char addr[INET6_ADDRSTRLEN];
     inet_ntop (client->ss_family, get_in_addr ((struct sockaddr*) client),
@@ -152,8 +148,8 @@ static int make_list (const struct sockaddr_storage *client, void *data)
 #endif
     node->next = NULL;
 
-    arg->prev->next = node;
-    arg->prev = node;
+    ml_arg->prev->next = node;
+    ml_arg->prev = node;
 
     return 0;
 }
@@ -204,10 +200,10 @@ int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
     return CL_OK;
 }
 
-static int fwd_to_client (const struct sockaddr_storage *client, void *arg)
+static int fwd_to_client (const void *data, void *arg)
 {
     struct msg_info *mi = arg;
-    udp_send_msg (mi->msg, mi->len, client);
+    udp_send_msg (mi->msg, mi->len, data);
     return 0;
 }
 
