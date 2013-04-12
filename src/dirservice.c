@@ -23,14 +23,30 @@
 
 #define REQ_DELIM " \t\r\n"
 
-/*-----------------------------------------------------------------------------
- * Send the standard error ACK */
-//-----------------------------------------------------------------------------
-static void send_error (int sock)
-{
-    struct response_node head;
+enum input_errors { ENOCMD, ENONUM, ENOPORT, EBADCMD, EBADNUM, EBADPORT };
+static const char *psdir_strerror[] = {
+    [ENOCMD]   = "no command given",
+    [ENONUM]   = "missing argument 'n'",
+    [ENOPORT]  = "missing argument 'port'",
+    [EBADCMD]  = "invalid command",
+    [EBADNUM]  = "invalid argument 'n'",
+    [EBADPORT] = "invalid argument 'port'" // 23
+};
 
-    response_bad (&head);
+static void send_error (int sock, int no)
+{
+#ifdef LISP_OUTPUT
+#define ERR_FMT "(:status \"error\" :code %d :reason \"%s\")"
+#define ERR_LEN 100
+#else
+#define ERR_FMT "{\"status\":\"error\",\"code\":%d,\"reason\":\"%s\"}" 
+#define ERR_LEN 100
+#endif
+    int rv;
+    char s[ERR_LEN];
+    struct response_node head;
+    rv = sprintf (s, ERR_FMT, no, psdir_strerror[no]);
+    make_simple_response (&head, s, rv);
     send_response (sock, head.next);
     free_response (head.next);
 }
@@ -71,8 +87,12 @@ static void process_list (struct conn_info *info, char *args)
     char *n, *p;
     
     n = strtok_r (args, REQ_DELIM, &p);
-    if (!n || clients_to_json (&jlist, NULL, n)) {
-        send_error (info->sock);
+    if (n == NULL) {
+        send_error (info->sock, ENONUM);
+        return;
+    }
+    if (clients_to_json (&jlist, NULL, n)) {
+        send_error (info->sock, EBADNUM);
         return;
     }
 
@@ -94,19 +114,30 @@ static void process_discover (struct conn_info *info, char *args)
     char *port, *n, *p;
     char *endptr;
     long lport;
+    int eno;
     
     port = strtok_r (args, REQ_DELIM, &p);
     n    = strtok_r (NULL, REQ_DELIM, &p);
-    if (!n || !port)
+    if (port == NULL) {
+        eno = ENOPORT;
         goto bail_error;
+    }
+    if (n == NULL) {
+        eno = ENONUM;
+        goto bail_error;
+    }
 
     lport = strtol (port, &endptr, 10);
-    if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0'))
+    if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0')) {
+        eno = EBADPORT;
         goto bail_error;
+    }
 
     set_in_port ((struct sockaddr*)&info->addr, htons ((in_port_t) lport));
-    if (clients_to_json (&jlist, &info->addr, n))
+    if (clients_to_json (&jlist, &info->addr, n)) {
+        eno = EBADNUM;
         goto bail_error;
+    }
 
     make_response_with_body (&response_head, jlist);
 #ifdef P2PSERV_LOG
@@ -117,7 +148,7 @@ static void process_discover (struct conn_info *info, char *args)
     return;
 
 bail_error:
-    send_error (info->sock);
+    send_error (info->sock, eno);
 }
 
 /*-----------------------------------------------------------------------------
@@ -143,7 +174,7 @@ static void *handle_connection (void *data)
 
         // dispatch
         if (!cmd)
-            send_error (info->sock);
+            send_error (info->sock, ENOCMD);
         else if (cmd_equal (cmd, "LIST", 4))
             process_list (info, args);
         else if (cmd_equal (cmd, "DISCOVER", 8))
@@ -151,7 +182,7 @@ static void *handle_connection (void *data)
         else if (cmd_equal (cmd, "EXIT", 4))
             break;
         else
-            send_error (info->sock);
+            send_error (info->sock, EBADCMD);
     }
 
     // clean up
