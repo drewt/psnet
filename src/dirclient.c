@@ -63,14 +63,49 @@ static int parse_header (int *status, size_t *size, char *msg)
     return 0;
 }
 
+/*static int udp_send_command (const char *cmd, size_t len, const char *host,
+        const char *port)
+{
+    struct addrinfo hints, *servinfo, *p;
+    int rv;
+
+    memset (&hints, 0, sizeof (hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    if ((rv = getaddrinfo (host, port, &hints, &servinfo)) != 0) {
+        fprintf (stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+        return -1;
+    }
+
+    for (p = servinfo; p != NULL; p = p->ai_next) {
+        if ((sockfd = socket (p->ai_family, p->ai_socktype,
+                p->ai_protocol)) == -1) {
+            continue;
+        }
+        break;
+    }
+
+    if (p == NULL) {
+        fprintf (stderr, "client: failed to connect\n");
+        return -1;
+    }
+
+    freeaddrinfo (servinfo);
+
+    udp_send_msg (cmd, len, p->ai_addr);
+
+    return 0;
+}*/
+
 /*-----------------------------------------------------------------------------
  * Sends 'cmd' to the directory given by 'host' and 'port'.  If 'dest' is not
  * NULL, it will point to a string containing the response from the directory
  * (minus the header) when this function returns.  The memory allocated for
  * this data should be freed by the caller */
 //-----------------------------------------------------------------------------
-static int send_command (char **dest, const char *cmd, char *host, char *port,
-        int *status)
+static int tcp_send_command (char **dest, const char *cmd, const char *host,
+        const char *port, int *status)
 {
     size_t size;
     int sockfd, numbytes;
@@ -166,7 +201,7 @@ int dir_discover (struct node_list *prev, char *host, char *host_port,
     char cmd[DISCOVER_STRLEN];
 
     snprintf (cmd, DISCOVER_STRLEN, "DISCOVER %s %d\r\n\r\n", listen_port, n);
-    if (send_command (&list, cmd, host, host_port, &status) < 1) {
+    if (tcp_send_command (&list, cmd, host, host_port, &status) < 1) {
         fprintf (stderr, "get_list: failed to retrieve list from directory\n");
         return -1;
     }
@@ -193,7 +228,7 @@ int dir_list (struct node_list *prev, char *host, char *port, int n)
     char cmd[LIST_STRLEN];
 
     snprintf (cmd, LIST_STRLEN, "LIST %d\r\n\r\n", n);
-    if (send_command (&list, cmd, host, port, &status) < 1) {
+    if (tcp_send_command (&list, cmd, host, port, &status) < 1) {
         fprintf (stderr, "get_list: failed to retrieve list from directory\n");
         return -1;
     }
@@ -216,6 +251,6 @@ int dir_connect (char *host, char *host_port, char *listen_port, int *status)
 #define CONNECT_STRLEN (13 + PORT_STRLEN)
     char s[CONNECT_STRLEN];
     snprintf (s, CONNECT_STRLEN, "CONNECT %s\r\n\r\n", listen_port);
-    return send_command (NULL, s, host, host_port, status);
+    return tcp_send_command (NULL, s, host, host_port, status);
 #undef CONNECT_STRLEN
 }

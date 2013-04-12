@@ -1,0 +1,4 @@
+[Settings]
+dir_addr=127.0.0.1
+dir_port=6666
+max_threads=10000

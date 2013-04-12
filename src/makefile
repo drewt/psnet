@@ -5,7 +5,7 @@ CFLAGS  = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g -pthread \
 	  -I $(INC) $(DEFINES)
 
 OFILES = $(BIN)/request.o $(BIN)/response.o $(BIN)/client.o $(BIN)/deltalist.o \
-	  $(BIN)/udpserver.o
+	  $(BIN)/udpserver.o $(BIN)/ini.o
 DIROFILES = $(BIN)/dirservice.o $(BIN)/tcpserver.o 
 NODEOFILES = $(BIN)/nodeservice.o $(BIN)/router.o $(BIN)/dirclient.o \
 	     $(BIN)/nodelist.o $(BIN)/msgcache.o $(BIN)/jsmn.o
@@ -37,6 +37,7 @@ $(BIN)/deltalist.o: $(INC)/deltalist.h
 $(BIN)/client.o: $(INC)/client.h $(INC)/response.h $(INC)/deltalist.h \
     $(INC)/udp.h
 $(BIN)/jsmn.o: $(INC)/jsmn.h
+$(BIN)/inih.o: $(INC)/ini.h
 
 # directory
 $(BIN)/dirservice.o: $(INC)/tcp.h $(INC)/response.h $(INC)/client.h

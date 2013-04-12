@@ -17,7 +17,7 @@
 
 struct msg_info;
 
-void router_init (char *listen_port);
+void router_init (char *dir_addr, char *dir_port, char *listen_port);
 void flood_message (struct msg_info *mi);
 
 #endif

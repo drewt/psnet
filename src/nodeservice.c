@@ -15,15 +15,23 @@
 
 #define JSMN_STRICT
 #include "jsmn.h"
+#include "ini.h"
 
 #define MAX_HOPS 4
 
 #define PONG_MAX (25 + PORT_STRLEN)
 
 static struct {
-    char *str;
-    size_t len;
-} udp_port;
+    char *dir_addr;
+    char *dir_port;
+    char *listen_port;
+    in_port_t max_threads;
+} settings = {
+    .dir_addr = "127.0.0.1",
+    .dir_port = "6666",
+    .listen_port = "5555",
+    .max_threads = 10000
+};
 
 /*-----------------------------------------------------------------------------
  * Process a 'ping' packet: send a pong */
@@ -81,6 +89,7 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
     int hops, hop_port, id;
     char *msg = mi->msg;
     char *msgid;
+    char *s, *d;
     char v;
     long lport;
 
@@ -112,12 +121,14 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 
     // set hop-port to our listen port
     // XXX: hop-port should be a string of length PORT_STRLEN so there is space
-    memset (msg+tok[hop_port].start, ' ', PORT_STRLEN);
-    strncpy (msg+tok[hop_port].start, udp_port.str, udp_port.len);
+    for (d = msg + tok[hop_port].start, s = settings.listen_port;
+            *s != '\0'; *d++ = *s++);
+    while (*d != '"') *d++ = ' ';
 
     flood_message (mi);
 
 #ifdef P2PSERV_LOG
+    printf ("%s", msg);
     printf (ANSI_YELLOW "F %s\n" ANSI_RESET, msgid);
 #endif
 }
@@ -169,10 +180,27 @@ cleanup:
 //-----------------------------------------------------------------------------
 static _Noreturn void usage (void)
 {
-    puts ("usage: infranode [nclients] [port]\n"
-          "       where 'nclients' is the maximum number of threads\n"
-          "       and 'port' is the port number to listen on");
+    puts ("usage: infranode [port]\n"
+          "       where 'port' is the port number to listen on");
     exit (EXIT_FAILURE);
+}
+
+static int ini_handler (void *user, const char *section, const char *name,
+        const char *value)
+{
+    if (!strcmp (name, "dir_addr")) {
+        settings.dir_addr = strdup (value);
+    } else if (!strcmp (name, "dir_port")) {
+        settings.dir_port = strdup (value);
+    } else if (!strcmp (name, "udp_port")) {
+        settings.listen_port = strdup (value);
+    } else if (!strcmp (name, "max_threads")) {
+        long lport = strtol (value, NULL, 10);
+        if (lport < PORT_MIN || lport > PORT_MAX)
+            return 0;
+        settings.max_threads = (in_port_t) lport;
+    }
+    return 1;
 }
 
 /*-----------------------------------------------------------------------------
@@ -180,34 +208,43 @@ static _Noreturn void usage (void)
 //-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
+    char *home, *path;
     char *endptr;
     int sockfd;
-    int max_threads;
     long lport;
 
-    if (argc != 3)
+    if (argc != 2)
         usage ();
 
+    // read the port number from argv
     endptr = NULL;
-    max_threads = strtol (argv[1], &endptr, 10);
-    if (max_threads < 1 || (endptr && *endptr != '\0')) {
-        fprintf (stderr, "error: 'nclients' must be a positive integer\n");
-        usage ();
-    }
-
-    endptr = NULL;
-    lport = strtol (argv[2], &endptr, 10);
+    lport = strtol (argv[1], &endptr, 10);
     if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0')) {
         fprintf (stderr, "error: invalid port\n");
         usage ();
     }
-    udp_port.str = argv[2];
-    udp_port.len = strlen (udp_port.str);
+    settings.listen_port= argv[1];
 
+    // read additional settings from configuration file
+    if (!ini_parse ("psnoderc", ini_handler, NULL))
+        goto init;
+
+    home = getenv ("HOME");
+    path = malloc (strlen (home) + 10);
+    sprintf (path, "%s%s", home, ".psnoderc");
+    if (!(lport = ini_parse (path, ini_handler, NULL)))
+        goto init;
+
+    if (!ini_parse ("/etc/psnoderc", ini_handler, NULL))
+        goto init;
+
+    fprintf (stderr, "error: failed to read psnoderc\n");
+
+init:
     clients_init ();
     msg_cache_init ();
-    router_init (udp_port.str);
+    router_init (settings.dir_addr, settings.dir_port, settings.listen_port);
 
-    sockfd = udp_server_init (argv[2]);
-    udp_server_main (sockfd, max_threads, handle_message);
+    sockfd = udp_server_init (argv[1]);
+    udp_server_main (sockfd, settings.max_threads, handle_message);
 }

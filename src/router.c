@@ -20,14 +20,21 @@
 static struct node_list routers;
 static pthread_mutex_t routers_lock;
 
+struct dir_arg {
+    char *addr;
+    char *port;
+    char *listen;
+};
+
 static _Noreturn void *router_update_thread (void *data)
 {
-    char *port = data;
+    struct dir_arg *a = data;
 
     for(;;) {
         for (;;) {
             pthread_mutex_lock (&routers_lock);
-            if (!dir_discover (&routers, DIR_ADDR, DIR_PORT, port, OUTDEGREE))
+            if (!dir_discover (&routers, a->addr, a->port, a->listen,
+                        OUTDEGREE))
                 break;
             fprintf (stderr, "get_list: failed to update router list\n");
             pthread_mutex_unlock (&routers_lock);
@@ -47,10 +54,10 @@ static _Noreturn void *router_update_thread (void *data)
 static _Noreturn void *router_keepalive_thread (void *data)
 {
     int status;
-    char *port = data;
+    struct dir_arg *a = data;
 
     for(;;) {
-        if (dir_connect (DIR_ADDR, DIR_PORT, port, &status) == -1)
+        if (dir_connect (a->addr, a->port, a->listen, &status) == -1)
             fprintf (stderr, "send_connect: failed to update directory\n");
         else if (status != STATUS_OKAY)
             fprintf (stderr, "send_connect: directory returned error %d\n",
@@ -59,15 +66,17 @@ static _Noreturn void *router_keepalive_thread (void *data)
     }
 }
 
-void router_init (char *listen_port)
+void router_init (char *dir_addr, char *dir_port, char *listen_port)
 {
     pthread_t tid;
+    struct dir_arg *arg = malloc (sizeof (struct dir_arg));
+    *arg = (struct dir_arg) { dir_addr, dir_port, listen_port };
 
     routers.next = NULL;
     pthread_mutex_init (&routers_lock, NULL);
-    if (pthread_create (&tid, NULL, router_update_thread, listen_port))
+    if (pthread_create (&tid, NULL, router_update_thread, arg))
         perror ("pthread_create");
-    if (pthread_create (&tid, NULL, router_keepalive_thread, listen_port))
+    if (pthread_create (&tid, NULL, router_keepalive_thread, arg))
         perror ("pthread_create");
 }
 
