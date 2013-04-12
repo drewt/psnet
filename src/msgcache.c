@@ -11,6 +11,8 @@ static int delta_equals (const void *a, const void *b);
 static void delta_act (const void *msg);
 
 static struct delta_list msg_cache = {
+    .resolution = 1,
+    .interval = 10,
     .delta = 0,
     .delta_head = NULL,
     .delta_tail = NULL,

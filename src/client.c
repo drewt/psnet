@@ -15,6 +15,8 @@ static int delta_equals (const void *a, const void *b);
 static void delta_act (const void *client);
 
 static struct delta_list client_table = {
+    .resolution = 1,
+    .interval = 10,
     .delta = 0,
     .delta_head = NULL,
     .delta_tail = NULL,

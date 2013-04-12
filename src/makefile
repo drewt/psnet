@@ -1,6 +1,5 @@
 CC      = gcc
-DEFINES = -DEXP_INTERVAL=10 -DINTERVAL_SECONDS=1 -DP2PSERV_LOG \
-	  -D_Noreturn=__attribute\(\(noreturn\)\)
+DEFINES = -DP2PSERV_LOG -D_Noreturn=__attribute\(\(noreturn\)\)
 CFLAGS  = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g -pthread \
 	  -I $(INC) $(DEFINES)
 

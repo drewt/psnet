@@ -16,7 +16,10 @@
 typedef void data_t;
 
 struct delta_list {
+    unsigned int resolution;       // seconds per tick
+    unsigned int interval;         // expiration inverval (measured in ticks)
     unsigned int delta;            // sum of all individual deltas
+
     struct delta_node *delta_head; // head of the delta list
     struct delta_node *delta_tail; // tail of the delta list
 

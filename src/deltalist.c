@@ -57,7 +57,7 @@ static void hash_insert (struct delta_list *table, struct delta_node *node)
 //-----------------------------------------------------------------------------
 static void dl_insert_node (struct delta_list *table, struct delta_node *node)
 {
-    node->delta = EXP_INTERVAL;
+    node->delta = table->interval;
 
     if (!table->delta_head) {
         table->delta_head = table->delta_tail = node;
@@ -71,7 +71,7 @@ static void dl_insert_node (struct delta_list *table, struct delta_node *node)
     }
     node->dl_next = NULL;
 
-    table->delta = EXP_INTERVAL;
+    table->delta = table->interval;
 }
 
 /*-----------------------------------------------------------------------------
@@ -157,7 +157,7 @@ static _Noreturn void *clock_thread (void *data)
     struct delta_list *table = data;
     unsigned int left;
     for (;;) {
-        for (left = INTERVAL_SECONDS; left; left = sleep (left));
+        for (left = table->resolution; left; left = sleep (left));
         delta_tick (table);
     }
 }
