@@ -55,7 +55,7 @@ static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
             get_in_port ((struct sockaddr*)&mi->addr));
 #endif
 
-    udp_send_msg ("{\"method\":\"pong\"}", 17, &mi->addr);
+    udp_send_msg ("{\"method\":\"pong\"}", 17, (struct sockaddr*) &mi->addr);
 }
 
 /*-----------------------------------------------------------------------------

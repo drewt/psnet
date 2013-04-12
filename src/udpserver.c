@@ -16,8 +16,7 @@ int udp_threads;
 pthread_mutex_t udp_threads_lock;
 
 // XXX: doesn't really belong here, but doesn't belong anywhere else either
-void udp_send_msg (const char *msg, size_t len,
-        const struct sockaddr_storage *dst)
+void udp_send_msg (const char *msg, size_t len, const struct sockaddr *dst)
 {
     socklen_t sin_size;
     int s;
@@ -27,10 +26,10 @@ void udp_send_msg (const char *msg, size_t len,
         return;
     }
 
-    sin_size = dst->ss_family == AF_INET ? sizeof (struct sockaddr_in) :
+    sin_size = dst->sa_family == AF_INET ? sizeof (struct sockaddr_in) :
             sizeof (struct sockaddr_in6);
 
-    if (sendto (s, msg, len, 0, (struct sockaddr*) dst, sin_size) == -1)
+    if (sendto (s, msg, len, 0, dst, sin_size) == -1)
         perror ("sendto");
 }
 

@@ -12,6 +12,7 @@
 #include "common.h"
 #include "nodelist.h"
 #include "tcp.h"
+#include "udp.h"
 #include "jsmn.h"
 
 /*-----------------------------------------------------------------------------
@@ -63,10 +64,10 @@ static int parse_header (int *status, size_t *size, char *msg)
     return 0;
 }
 
-/*static int udp_send_command (const char *cmd, size_t len, const char *host,
+static int udp_send_command (const char *cmd, size_t len, const char *host,
         const char *port)
 {
-    struct addrinfo hints, *servinfo, *p;
+    struct addrinfo hints, *servinfo;
     int rv;
 
     memset (&hints, 0, sizeof (hints));
@@ -78,25 +79,12 @@ static int parse_header (int *status, size_t *size, char *msg)
         return -1;
     }
 
-    for (p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket (p->ai_family, p->ai_socktype,
-                p->ai_protocol)) == -1) {
-            continue;
-        }
-        break;
-    }
-
-    if (p == NULL) {
-        fprintf (stderr, "client: failed to connect\n");
-        return -1;
-    }
+    udp_send_msg (cmd, len, servinfo->ai_addr);
 
     freeaddrinfo (servinfo);
 
-    udp_send_msg (cmd, len, p->ai_addr);
-
     return 0;
-}*/
+}
 
 /*-----------------------------------------------------------------------------
  * Sends 'cmd' to the directory given by 'host' and 'port'.  If 'dest' is not
@@ -246,11 +234,12 @@ int dir_list (struct node_list *prev, char *host, char *port, int n)
 /*-----------------------------------------------------------------------------
  * Sends a CONNECT command to the directory given by 'host' and 'port' */
 //-----------------------------------------------------------------------------
-int dir_connect (char *host, char *host_port, char *listen_port, int *status)
+int dir_connect (char *host, char *host_port, char *listen_port)
 {
 #define CONNECT_STRLEN (13 + PORT_STRLEN)
     char s[CONNECT_STRLEN];
-    snprintf (s, CONNECT_STRLEN, "CONNECT %s\r\n\r\n", listen_port);
-    return tcp_send_command (NULL, s, host, host_port, status);
+    size_t len;
+    len = snprintf (s, CONNECT_STRLEN, "CONNECT %s\r\n\r\n", listen_port);
+    return udp_send_command (s, len, host, host_port);
 #undef CONNECT_STRLEN
 }

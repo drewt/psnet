@@ -53,15 +53,11 @@ static _Noreturn void *router_update_thread (void *data)
 
 static _Noreturn void *router_keepalive_thread (void *data)
 {
-    int status;
     struct dir_arg *a = data;
 
     for(;;) {
-        if (dir_connect (a->addr, a->port, a->listen, &status) == -1)
+        if (dir_connect (a->addr, a->port, a->listen) == -1)
             fprintf (stderr, "send_connect: failed to update directory\n");
-        else if (status != STATUS_OKAY)
-            fprintf (stderr, "send_connect: directory returned error %d\n",
-                    status);
         sleep (DIR_KEEPALIVE_INTERVAL);
     }
 }
@@ -90,7 +86,7 @@ void flood_message (struct msg_info *mi)
     for (it = routers.next; it; it = it->next) {
         if (sockaddr_equals ((struct sockaddr*)it, (struct sockaddr*)&mi->addr))
             continue;
-        udp_send_msg (mi->msg, mi->len, &it->addr);
+        udp_send_msg (mi->msg, mi->len, (struct sockaddr*) &it->addr);
     }
 
     // send message to clients

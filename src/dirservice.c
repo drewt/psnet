@@ -16,6 +16,7 @@
 
 #include "common.h"
 #include "tcp.h"
+#include "udp.h"
 #include "response.h"
 #include "client.h"
 
@@ -190,6 +191,36 @@ static void *handle_connection (void *data)
     pthread_exit (NULL);
 }
 
+static void *handle_message (void *data)
+{
+    struct msg_info *mi = data;
+    char *cmd, *port, *p;
+
+    // parse message
+    cmd  = strtok_r (mi->msg, REQ_DELIM, &p);
+    port = strtok_r (NULL, REQ_DELIM, &p);
+
+    if (!cmd || !cmd_equal (cmd, "CONNECT", 7))
+        goto cleanup;
+
+    if (!port || add_client (&mi->addr, port))
+        goto cleanup;
+
+#ifdef P2PSERV_LOG
+    printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, mi->paddr, port);
+#endif
+
+cleanup:
+    pthread_mutex_lock (&udp_threads_lock);
+    udp_threads--;
+    pthread_mutex_unlock (&udp_threads_lock);
+    free (mi);
+#ifdef P2PSERV_LOG
+    printf ("-M %s\n", mi->paddr);
+#endif
+    pthread_exit (NULL);
+}
+
 /*-----------------------------------------------------------------------------
  * Usage... */
 //-----------------------------------------------------------------------------
@@ -201,6 +232,12 @@ static _Noreturn void usage (void)
     exit (EXIT_FAILURE);
 }
 
+void *udp_serve (void *data)
+{
+    int sockfd = udp_server_init (data);
+    udp_server_main (sockfd, 10000, handle_message);
+}
+
 /*-----------------------------------------------------------------------------
  * Main... */
 //-----------------------------------------------------------------------------
@@ -209,6 +246,7 @@ int main (int argc, char *argv[])
     char *endptr;
     int sockfd;
     int max_threads;
+    pthread_t tid;
 
     if (argc != 3)
         usage ();
@@ -231,7 +269,12 @@ int main (int argc, char *argv[])
 #endif
 
     clients_init ();
-    sockfd = tcp_server_init (argv[2]);
 
+    if (pthread_create (&tid, NULL, udp_serve, argv[2]))
+        perror ("pthread_create");
+    else if (pthread_detach (tid))
+        perror ("pthread_detach");
+
+    sockfd = tcp_server_init (argv[2]);
     tcp_server_main (sockfd, max_threads, handle_connection);
 }
