@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <time.h>
 
 #include "common.h"
@@ -21,18 +22,6 @@
 #include "client.h"
 
 #define REQ_DELIM " \t\r\n"
-
-/*-----------------------------------------------------------------------------
- * Send the standard OK ACK */
-//-----------------------------------------------------------------------------
-static void send_okay (int sock)
-{
-    struct response_node head;
-
-    response_ok (&head);
-    send_response (sock, head.next);
-    free_response (head.next);
-}
 
 /*-----------------------------------------------------------------------------
  * Send the standard error ACK */
@@ -49,36 +38,26 @@ static void send_error (int sock)
 /*-----------------------------------------------------------------------------
  * Process a 'CONNECT [port]' command */
 //-----------------------------------------------------------------------------
-static void process_connect (struct conn_info *info, char *args)
+static void process_connect (struct msg_info *mi, char *port)
 {
-    char *port, *p;
-
-    port = strtok_r (args, REQ_DELIM, &p);
-    if (!port || add_client (&info->addr, port)) {
-        send_error (info->sock);
+    if (add_client (&mi->addr, port))
         return;
-    }
-    send_okay (info->sock);
+
 #ifdef P2PSERV_LOG
-    printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, info->paddr, port);
+    printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, mi->paddr, port);
 #endif
 }
 
 /*-----------------------------------------------------------------------------
  * Process a 'DISCONNECT [port]' command */
 //-----------------------------------------------------------------------------
-static void process_disconnect (struct conn_info *info, char *args)
+static void process_disconnect (struct msg_info *mi, char *port)
 {
-    char *port, *p;
-
-    port = strtok_r (args, REQ_DELIM, &p);
-    if (!port || remove_client (&info->addr, port)) {
-        send_error (info->sock);
+    if (remove_client (&mi->addr, port))
         return;
-    }
-    send_okay (info->sock);
+
 #ifdef P2PSERV_LOG
-    printf (ANSI_RED "- %s %s\n" ANSI_RESET, info->paddr, port);
+    printf (ANSI_RED "- %s %s\n" ANSI_RESET, mi->paddr, port);
 #endif
 }
 
@@ -165,10 +144,6 @@ static void *handle_connection (void *data)
         // dispatch
         if (!cmd)
             send_error (info->sock);
-        else if (cmd_equal (cmd, "CONNECT", 7))
-            process_connect (info, args);
-        else if (cmd_equal (cmd, "DISCONNECT", 10))
-            process_disconnect (info, args);
         else if (cmd_equal (cmd, "LIST", 4))
             process_list (info, args);
         else if (cmd_equal (cmd, "DISCOVER", 8))
@@ -200,15 +175,12 @@ static void *handle_message (void *data)
     cmd  = strtok_r (mi->msg, REQ_DELIM, &p);
     port = strtok_r (NULL, REQ_DELIM, &p);
 
-    if (!cmd || !cmd_equal (cmd, "CONNECT", 7))
+    if (!cmd || !port)
         goto cleanup;
-
-    if (!port || add_client (&mi->addr, port))
-        goto cleanup;
-
-#ifdef P2PSERV_LOG
-    printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, mi->paddr, port);
-#endif
+    else if (cmd_equal (cmd, "CONNECT", 7))
+        process_connect (mi, port);
+    else if (cmd_equal (cmd, "DISCONNECT", 10))
+        process_disconnect (mi, port);
 
 cleanup:
     pthread_mutex_lock (&udp_threads_lock);
