@@ -9,9 +9,9 @@ clean:
 
 dirmem: all
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
-	    --num-callers=20 --track-fds=yes $(BIN)/infradir 10000 6666
+	    --num-callers=20 --track-fds=yes $(BIN)/psdird 10000 6666
 
 nodemem: all
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
-	    --num-callers=20 --track-fds=yes $(BIN)/infranode 5555
+	    --num-callers=20 --track-fds=yes $(BIN)/psnoded 5555
 

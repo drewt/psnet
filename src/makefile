@@ -9,7 +9,7 @@ DIROFILES = $(BIN)/dirservice.o
 NODEOFILES = $(BIN)/nodeservice.o $(BIN)/router.o $(BIN)/dirclient.o \
 	     $(BIN)/nodelist.o $(BIN)/msgcache.o $(BIN)/jsmn.o
 
-XFILES = $(BIN)/infradir $(BIN)/infranode
+XFILES = $(BIN)/psdird $(BIN)/psnoded
 
 INC = ../include
 BIN = ../bin
@@ -19,11 +19,11 @@ $(BIN)/%.o: %.c
 
 all: $(XFILES)
 
-$(BIN)/infradir: $(OFILES) $(DIROFILES)
-	$(CC) $(CFLAGS) $(OFILES) $(DIROFILES) -o $(BIN)/infradir
+$(BIN)/psdird: $(OFILES) $(DIROFILES)
+	$(CC) $(CFLAGS) $(OFILES) $(DIROFILES) -o $(BIN)/psdird
 
-$(BIN)/infranode: $(OFILES) $(NODEOFILES)
-	$(CC) $(CFLAGS) $(OFILES) $(NODEOFILES) -o $(BIN)/infranode -lm
+$(BIN)/psnoded: $(OFILES) $(NODEOFILES)
+	$(CC) $(CFLAGS) $(OFILES) $(NODEOFILES) -o $(BIN)/psnoded -lm
 
 $(OFILES): $(INC)/common.h
 
@@ -53,11 +53,11 @@ $(BIN)/router.o: $(INC)/router.h $(INC)/udp.h $(INC)/nodelist.h \
 clean:
 	rm -f $(BIN)/*
 
-dirmem: $(BIN)/infradir
+dirmem: $(BIN)/psdird
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
-	    --num-callers=20 --track-fds=yes $(BIN)/infradir 10000 6666
+	    --num-callers=20 --track-fds=yes $(BIN)/psdird 10000 6666
 
-nodemem: $(BIN)/infranode
+nodemem: $(BIN)/psnoded
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
-	    --num-callers=20 --track-fds=yes $(BIN)/infranode 10000 5555
+	    --num-callers=20 --track-fds=yes $(BIN)/psnoded 10000 5555
 
