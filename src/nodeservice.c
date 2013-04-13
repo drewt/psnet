@@ -46,8 +46,7 @@ static const char *psnode_strerror[] = {
 /*-----------------------------------------------------------------------------
  * Process an info request */
 //-----------------------------------------------------------------------------
-static void process_info (struct msg_info *mi, const char *msg, jsmntok_t *tok,
-        size_t ntok)
+static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
     struct response_node head, body;
 
@@ -63,24 +62,15 @@ static void process_info (struct msg_info *mi, const char *msg, jsmntok_t *tok,
 //-----------------------------------------------------------------------------
 static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    int port;
-    long lport;
-
-    if ((port = jsmn_get_value (mi->msg, tok, "port")) == -1)
-        return;
-
-    lport = strtol (mi->msg + tok[port].start, NULL, 10);
-    if (lport < PORT_MIN || lport > PORT_MAX)
-        return;
-
-    set_in_port ((struct sockaddr*)&mi->addr, htons((in_port_t) lport));
+    struct response_node head;
+    response_ok (&head);
+    send_response (mi->sock, head.next);
+    free_response (head.next);
 
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "P %s %d\n" ANSI_RESET, mi->paddr,
             get_in_port ((struct sockaddr*)&mi->addr));
 #endif
-
-    udp_send_msg ("{\"method\":\"pong\"}", 17, (struct sockaddr*) &mi->addr);
 }
 
 /*-----------------------------------------------------------------------------
@@ -187,12 +177,17 @@ static void *handle_connection (void *data)
             break; // connection closed by client
 
         // dispatch
-        if ((method = parse_message (mi->msg, tok, &ntok)) == -1)
+        if ((method = parse_message (mi->msg, tok, &ntok)) == -1) {
             node_error (mi->sock, ENOMETHOD);
-        else if (jsmn_tokeq (mi->msg, &tok[method], "info"))
-            process_info (mi, mi->msg, tok, ntok);
-        else
+            break;
+        } else if (jsmn_tokeq (mi->msg, &tok[method], "info")) {
+            process_info (mi, tok, ntok);
+        } else if (jsmn_tokeq (mi->msg, &tok[method], "ping")) {
+            process_ping (mi, tok, ntok);
+        } else {
             node_error (mi->sock, EBADMETHOD);
+            break;
+        }
     }
 
     // clean up
@@ -224,8 +219,6 @@ static void *handle_message (void *data)
         process_connect (mi, tok, ntok);
     else if (jsmn_tokeq (mi->msg, &tok[method], "broadcast"))
         process_broadcast (mi, tok, ntok);
-    else if (jsmn_tokeq (mi->msg, &tok[method], "ping"))
-        process_ping (mi, tok, ntok);
 
 cleanup:
     pthread_mutex_lock (&udp_threads_lock);
