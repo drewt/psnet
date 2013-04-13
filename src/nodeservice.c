@@ -28,12 +28,10 @@ static struct {
     char *dir_addr;
     char *dir_port;
     char *listen_port;
-    in_port_t max_threads;
 } settings = {
     .dir_addr = "127.0.0.1",
     .dir_port = "6666",
     .listen_port = "5555",
-    .max_threads = 10000
 };
 
 #define node_error(sock, no) send_error (sock, no, psnode_strerror[no])
@@ -44,6 +42,10 @@ static const char *psnode_strerror[] = {
     [EBADMETHOD] = "unrecognized method",
     [EBADNUM]    = "invalid argument 'num'"
 };
+
+int max_threads = 1000;
+int num_threads;
+pthread_mutex_t num_threads_lock;
 
 /*-----------------------------------------------------------------------------
  * Process an info request */
@@ -223,9 +225,9 @@ static void *handle_connection (void *data)
 
     // clean up
     close (mi->sock);
-    pthread_mutex_lock (&tcp_threads_lock);
-    tcp_threads--;
-    pthread_mutex_unlock (&tcp_threads_lock);
+    pthread_mutex_lock (&num_threads_lock);
+    num_threads--;
+    pthread_mutex_unlock (&num_threads_lock);
 #ifdef PSNETLOG
     printf ("D %s\n", mi->paddr);
 #endif
@@ -252,9 +254,9 @@ static void *handle_message (void *data)
         process_broadcast (mi, tok, ntok);
 
 cleanup:
-    pthread_mutex_lock (&udp_threads_lock);
-    udp_threads--;
-    pthread_mutex_unlock (&udp_threads_lock);
+    pthread_mutex_lock (&num_threads_lock);
+    num_threads--;
+    pthread_mutex_unlock (&num_threads_lock);
     free (mi);
 #ifdef PSNETLOG
     printf ("-M %s\n", mi->paddr);
@@ -279,7 +281,7 @@ static void *udp_serve (void *data)
     pthread_detach (pthread_self ());
 
     sockfd = udp_server_init (data);
-    udp_server_main (sockfd, 10000, handle_message);
+    udp_server_main (sockfd, handle_message);
 }
 
 static int ini_handler (void *user, const char *section, const char *name,
@@ -292,10 +294,8 @@ static int ini_handler (void *user, const char *section, const char *name,
     } else if (!strcmp (name, "udp_port")) {
         settings.listen_port = strdup (value);
     } else if (!strcmp (name, "max_threads")) {
-        long lport = strtol (value, NULL, 10);
-        if (lport < PORT_MIN || lport > PORT_MAX)
-            return 0;
-        settings.max_threads = (in_port_t) lport;
+        if (!(max_threads = atoi (value)))
+            max_threads = 1000000;
     }
     return 1;
 }
@@ -339,6 +339,10 @@ int main (int argc, char *argv[])
     fprintf (stderr, "error: failed to read psnoderc\n");
 
 init:
+
+    num_threads = 0;
+    pthread_mutex_init (&num_threads_lock, NULL);
+
     clients_init ();
     msg_cache_init ();
     router_init (settings.dir_addr, settings.dir_port, settings.listen_port);
@@ -347,5 +351,5 @@ init:
         perror ("pthread_create");
 
     sockfd = tcp_server_init (argv[1]);
-    tcp_server_main (sockfd, settings.max_threads, handle_connection);
+    tcp_server_main (sockfd, handle_connection);
 }

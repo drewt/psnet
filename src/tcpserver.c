@@ -25,9 +25,6 @@
 
 #define LOG_FILE_PATH "/tmp/p2pservlog"
 
-int tcp_threads;
-pthread_mutex_t tcp_threads_lock;
-
 #ifdef DAEMON
 /*-----------------------------------------------------------------------------
  * Run the server in the background */
@@ -118,16 +115,13 @@ int tcp_server_init (char *port)
         exit (EXIT_FAILURE);
     }
 
-    tcp_threads = 0;
-    pthread_mutex_init (&tcp_threads_lock, NULL);
-
     return sockfd;
 }
 
 /*-----------------------------------------------------------------------------
  * The server's main accept() loop */
 //-----------------------------------------------------------------------------
-_Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*))
+_Noreturn void tcp_server_main (int sock, void*(*cb)(void*))
 {
     socklen_t sin_size;
     struct msg_info *targ;
@@ -149,17 +143,18 @@ _Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*))
         }
 
         // close connection if thread limit reached
-        pthread_mutex_lock (&tcp_threads_lock);
-        if (tcp_threads >= max_threads) {
+        pthread_mutex_lock (&num_threads_lock);
+        if (num_threads >= max_threads) {
             fprintf (stderr, "thread limit reached; refusing connection\n");
-            pthread_mutex_unlock (&tcp_threads_lock);
+            printf ("num_threads: %d\n", num_threads);
+            pthread_mutex_unlock (&num_threads_lock);
             close (targ->sock);
             free (targ);
             continue;
         }
 
-        tcp_threads++;
-        pthread_mutex_unlock (&tcp_threads_lock);
+        num_threads++;
+        pthread_mutex_unlock (&num_threads_lock);
 
         setsockopt (targ->sock, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv,
                 sizeof (tv));

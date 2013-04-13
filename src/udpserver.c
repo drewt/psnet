@@ -12,9 +12,6 @@
 #include "common.h"
 #include "udp.h"
 
-int udp_threads;
-pthread_mutex_t udp_threads_lock;
-
 // XXX: doesn't really belong here, but doesn't belong anywhere else either
 void udp_send_msg (const char *msg, size_t len, const struct sockaddr *dst)
 {
@@ -79,13 +76,13 @@ int udp_server_init (char *port)
 
     freeaddrinfo (servinfo);
 
-    udp_threads = 0;
-    pthread_mutex_init (&udp_threads_lock, NULL);
+    num_threads = 0;
+    pthread_mutex_init (&num_threads_lock, NULL);
 
     return sockfd;
 }
 
-_Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*))
+_Noreturn void udp_server_main (int sock, void *(*cb)(void*))
 {
     struct msg_info *msg;
     socklen_t sin_size;
@@ -103,16 +100,17 @@ _Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*))
         msg->msg[rc] = '\0';
         msg->len = rc;
 
-        pthread_mutex_lock (&udp_threads_lock);
-        if (udp_threads >= max_threads) {
-            fprintf (stderr, "thread limit reached: refusing connection\n");
-            pthread_mutex_unlock (&udp_threads_lock);
+        pthread_mutex_lock (&num_threads_lock);
+        if (num_threads >= max_threads) {
+            fprintf (stderr, "thread limit reached: discarding message\n");
+            pthread_mutex_unlock (&num_threads_lock);
             free (msg);
             continue;
         }
 
-        udp_threads++;
-        pthread_mutex_unlock (&udp_threads_lock);
+        printf ("num_threads: %d\n", num_threads);
+        num_threads++;
+        pthread_mutex_unlock (&num_threads_lock);
 
 #ifdef PSNETLOG
         inet_ntop (msg->addr.ss_family,

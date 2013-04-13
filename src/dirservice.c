@@ -34,6 +34,10 @@ static const char *psdir_strerror[] = {
     [EBADPORT] = "invalid argument 'port'" // 23
 };
 
+int max_threads;
+int num_threads;
+pthread_mutex_t num_threads_lock;
+
 /*-----------------------------------------------------------------------------
  * Process a 'CONNECT [port]' command */
 //-----------------------------------------------------------------------------
@@ -171,9 +175,9 @@ static void *handle_connection (void *data)
 
     // clean up
     close (mi->sock);
-    pthread_mutex_lock (&tcp_threads_lock);
-    tcp_threads--;
-    pthread_mutex_unlock (&tcp_threads_lock);
+    pthread_mutex_lock (&num_threads_lock);
+    num_threads--;
+    pthread_mutex_unlock (&num_threads_lock);
 #ifdef PSNETLOG
     printf ("D %s\n", mi->paddr);
 #endif
@@ -201,9 +205,9 @@ static void *handle_message (void *data)
         process_disconnect (mi, port);
 
 cleanup:
-    pthread_mutex_lock (&udp_threads_lock);
-    udp_threads--;
-    pthread_mutex_unlock (&udp_threads_lock);
+    pthread_mutex_lock (&num_threads_lock);
+    num_threads--;
+    pthread_mutex_unlock (&num_threads_lock);
     free (mi);
 #ifdef PSNETLOG
     printf ("-M %s\n", mi->paddr);
@@ -229,7 +233,7 @@ void *udp_serve (void *data)
     pthread_detach (pthread_self ());
 
     sockfd = udp_server_init (data);
-    udp_server_main (sockfd, 10000, handle_message);
+    udp_server_main (sockfd, handle_message);
 }
 
 /*-----------------------------------------------------------------------------
@@ -239,14 +243,13 @@ int main (int argc, char *argv[])
 {
     char *endptr;
     int sockfd;
-    int max_threads;
     pthread_t tid;
 
     if (argc != 3)
         usage ();
 
     endptr = NULL;
-    max_threads = strtol (argv[1], &endptr, 10);
+    max_threads = (int) strtol (argv[1], &endptr, 10);
     if (max_threads < 1 || (endptr && *endptr != '\0')) {
         puts ("error: 'nclients' must be an integer greater than 0");
         usage ();
@@ -262,11 +265,14 @@ int main (int argc, char *argv[])
     daemonize ();
 #endif
 
+    num_threads = 0;
+    pthread_mutex_init (&num_threads_lock, NULL);
+
     clients_init ();
 
     if (pthread_create (&tid, NULL, udp_serve, argv[2]))
         perror ("pthread_create");
 
     sockfd = tcp_server_init (argv[2]);
-    tcp_server_main (sockfd, max_threads, handle_connection);
+    tcp_server_main (sockfd, handle_connection);
 }

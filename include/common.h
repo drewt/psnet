@@ -38,6 +38,10 @@ struct msg_info {
 #endif
 };
 
+extern int max_threads;
+extern int num_threads;
+extern pthread_mutex_t num_threads_lock;
+
 static inline void *get_in_addr (const struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET)
