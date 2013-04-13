@@ -37,10 +37,12 @@ static struct {
 };
 
 #define node_error(sock, no) send_error (sock, no, psnode_strerror[no])
-enum input_errors { ENOMETHOD, EBADMETHOD };
+enum input_errors { ENOMETHOD, ENONUM, EBADMETHOD, EBADNUM };
 static const char *psnode_strerror[] = {
     [ENOMETHOD]  = "no method given",
-    [EBADMETHOD] = "unrecognized method"
+    [ENONUM]     = "missing argument 'num'",
+    [EBADMETHOD] = "unrecognized method",
+    [EBADNUM]    = "invalid argument 'num'"
 };
 
 /*-----------------------------------------------------------------------------
@@ -143,6 +145,38 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 #endif
 }
 
+/*-----------------------------------------------------------------------------
+ * */
+//-----------------------------------------------------------------------------
+static void process_discover (struct msg_info *mi, jsmntok_t *tok, int ntok)
+{
+    struct response_node head;
+    struct response_node *jlist;
+    int num;
+
+    if ((num = jsmn_get_value (mi->msg, tok, "num")) == -1) {
+        node_error (mi->sock, ENONUM);
+        return;
+    }
+
+    if (!(num = atoi (mi->msg + tok[num].start))) {
+        node_error (mi->sock, EBADNUM);
+        return;
+    }
+
+    routers_to_json (&jlist, num);
+    make_response_with_body (&head, jlist);
+    send_response (mi->sock, head.next);
+    free_response (head.next);
+
+#ifdef PSNETLOG
+    printf (ANSI_YELLOW "L %s\n" ANSI_RESET, mi->paddr);
+#endif
+}
+
+/*-----------------------------------------------------------------------------
+ * Parses a message into jsmn tokens */
+//-----------------------------------------------------------------------------
 static int parse_message (const char *msg, jsmntok_t *tok, size_t *ntok)
 {
     int rc;
@@ -179,6 +213,8 @@ static void *handle_connection (void *data)
             process_info (mi, tok, ntok);
         } else if (jsmn_tokeq (mi->msg, &tok[method], "ping")) {
             process_ping (mi, tok, ntok);
+        } else if (jsmn_tokeq (mi->msg, &tok[method], "discover")) {
+            process_discover (mi, tok, ntok);
         } else {
             node_error (mi->sock, EBADMETHOD);
             break;

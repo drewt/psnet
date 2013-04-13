@@ -92,7 +92,7 @@ static void process_list (struct msg_info *mi, char *args)
 //-----------------------------------------------------------------------------
 static void process_discover (struct msg_info *mi, char *args)
 {
-    struct response_node response_head;
+    struct response_node head;
     struct response_node *jlist;
     char *port, *n, *p;
     char *endptr;
@@ -122,12 +122,12 @@ static void process_discover (struct msg_info *mi, char *args)
         goto bail_error;
     }
 
-    make_response_with_body (&response_head, jlist);
+    make_response_with_body (&head, jlist);
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, mi->paddr, port);
 #endif
-    send_response (mi->sock, response_head.next);
-    free_response (response_head.next);
+    send_response (mi->sock, head.next);
+    free_response (head.next);
     return;
 
 bail_error:
@@ -154,16 +154,19 @@ static void *handle_connection (void *data)
         args = strtok_r (NULL, "", &p);
 
         // dispatch
-        if (!cmd)
+        if (!cmd) {
             dir_error (mi->sock, ENOCMD);
-        else if (cmd_equal (cmd, "LIST", 4))
-            process_list (mi, args);
-        else if (cmd_equal (cmd, "DISCOVER", 8))
-            process_discover (mi, args);
-        else if (cmd_equal (cmd, "EXIT", 4))
             break;
-        else
+        } else if (cmd_equal (cmd, "LIST", 4)) {
+            process_list (mi, args);
+        } else if (cmd_equal (cmd, "DISCOVER", 8)) {
+            process_discover (mi, args);
+        } else if (cmd_equal (cmd, "EXIT", 4)) {
+            break;
+        } else {
             dir_error (mi->sock, EBADCMD);
+            break;
+        }
     }
 
     // clean up
