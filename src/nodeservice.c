@@ -340,6 +340,10 @@ int main (int argc, char *argv[])
 
 init:
 
+#ifdef DAEMON
+    daemonize ();
+#endif
+
     num_threads = 0;
     pthread_mutex_init (&num_threads_lock, NULL);
 
