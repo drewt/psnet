@@ -75,7 +75,7 @@ static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
 
     set_in_port ((struct sockaddr*)&mi->addr, htons((in_port_t) lport));
 
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf (ANSI_YELLOW "P %s %d\n" ANSI_RESET, mi->paddr,
             get_in_port ((struct sockaddr*)&mi->addr));
 #endif
@@ -98,7 +98,7 @@ static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
     if (add_client (&mi->addr, mi->msg + tok[port].start))
         return;
 
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, mi->paddr,
             mi->msg + tok[port].start);
 #endif
@@ -152,7 +152,7 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 
     flood_message (mi);
 
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf ("%s", msg);
     printf (ANSI_YELLOW "F %s\n" ANSI_RESET, msgid);
 #endif
@@ -200,7 +200,7 @@ static void *handle_connection (void *data)
     pthread_mutex_lock (&tcp_threads_lock);
     tcp_threads--;
     pthread_mutex_unlock (&tcp_threads_lock);
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf ("D %s\n", ci->paddr);
 #endif
     free (ci);
@@ -232,7 +232,7 @@ cleanup:
     udp_threads--;
     pthread_mutex_unlock (&udp_threads_lock);
     free (mi);
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf ("-M %s\n", mi->paddr);
 #endif
     pthread_exit (NULL);

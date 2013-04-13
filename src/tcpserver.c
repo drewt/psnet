@@ -164,7 +164,7 @@ _Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*))
         setsockopt (targ->sock, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv,
                 sizeof (tv));
 
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
         inet_ntop (targ->addr.ss_family,
                 get_in_addr ((struct sockaddr*) &targ->addr),
                 targ->paddr, sizeof targ->paddr);

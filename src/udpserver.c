@@ -114,7 +114,7 @@ _Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*))
         udp_threads++;
         pthread_mutex_unlock (&udp_threads_lock);
 
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
         inet_ntop (msg->addr.ss_family,
                 get_in_addr ((struct sockaddr*) &msg->addr),
                 msg->paddr, sizeof msg->paddr);

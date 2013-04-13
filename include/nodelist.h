@@ -2,7 +2,7 @@
 #define _PSNET_NODELIST_H_
 
 #include <sys/socket.h>
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
 #include <netinet/in.h>
 #endif
 
@@ -10,7 +10,7 @@
 struct node_list {
     struct sockaddr_storage addr;
     struct node_list *next;
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     char paddr[INET6_ADDRSTRLEN];
 #endif
 };

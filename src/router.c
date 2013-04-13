@@ -40,7 +40,7 @@ static _Noreturn void *router_update_thread (void *data)
             pthread_mutex_unlock (&routers_lock);
             sleep (DIR_RETRY_INTERVAL);
         }
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
         for (struct node_list *it = routers.next; it; it = it->next) {
             printf ("U %s %d\n", it->paddr,
                     ntohs (get_in_port ((struct sockaddr*) &it->addr)));

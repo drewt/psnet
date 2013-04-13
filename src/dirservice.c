@@ -42,7 +42,7 @@ static void process_connect (struct msg_info *mi, char *port)
     if (add_client (&mi->addr, port))
         return;
 
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, mi->paddr, port);
 #endif
 }
@@ -55,7 +55,7 @@ static void process_disconnect (struct msg_info *mi, char *port)
     if (remove_client (&mi->addr, port))
         return;
 
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf (ANSI_RED "- %s %s\n" ANSI_RESET, mi->paddr, port);
 #endif
 }
@@ -80,7 +80,7 @@ static void process_list (struct conn_info *ci, char *args)
     }
 
     make_response_with_body (&head, jlist);
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf (ANSI_YELLOW "L %s\n" ANSI_RESET, ci->paddr);
 #endif
     send_response (ci->sock, head.next);
@@ -123,7 +123,7 @@ static void process_discover (struct conn_info *ci, char *args)
     }
 
     make_response_with_body (&response_head, jlist);
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, ci->paddr, port);
 #endif
     send_response (ci->sock, response_head.next);
@@ -171,7 +171,7 @@ static void *handle_connection (void *data)
     pthread_mutex_lock (&tcp_threads_lock);
     tcp_threads--;
     pthread_mutex_unlock (&tcp_threads_lock);
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf ("D %s\n", ci->paddr); fflush (stdout);
 #endif
     free (ci);
@@ -202,7 +202,7 @@ cleanup:
     udp_threads--;
     pthread_mutex_unlock (&udp_threads_lock);
     free (mi);
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     printf ("-M %s\n", mi->paddr);
 #endif
     pthread_exit (NULL);

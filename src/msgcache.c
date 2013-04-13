@@ -44,7 +44,7 @@ static int delta_equals (const void *a, const void *b)
 
 static void delta_act (const void *msg)
 {
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     const char *id = msg;
     printf (ANSI_RED "X %s\n" ANSI_RESET, id);
 #endif
@@ -53,7 +53,7 @@ static void delta_act (const void *msg)
 int cache_msg (char *id)
 {
     int rc = delta_update (&msg_cache, id);
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     if (!rc)
         printf (ANSI_GREEN "C %s\n" ANSI_RESET, id);
 #endif

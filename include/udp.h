@@ -3,7 +3,7 @@
 
 #include <sys/socket.h>
 #include <pthread.h>
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
 #include <netinet/in.h>
 #endif
 
@@ -14,7 +14,7 @@ struct msg_info {
     struct sockaddr_storage addr;
     size_t len;
     char msg[UDP_MSG_MAX];
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     char paddr[INET6_ADDRSTRLEN];
 #endif
 };

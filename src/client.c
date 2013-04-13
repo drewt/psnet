@@ -46,7 +46,7 @@ static int delta_equals (const void *a, const void *b)
 
 static void delta_act (const void *data)
 {
-#ifdef P2PSERV_LOG
+#ifdef PSNETLOG
     const struct sockaddr_storage *client = data;
     char addr[INET6_ADDRSTRLEN];
     inet_ntop (client->ss_family, get_in_addr ((struct sockaddr*) client),
