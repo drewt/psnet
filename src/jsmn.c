@@ -315,6 +315,26 @@ int jsmn_get_value (const char *msg, jsmntok_t *obj, const char *key)
     return -1;
 }
 
+#include <stdarg.h>
+int jsmn_get_values (const char *msg, jsmntok_t *obj, ...)
+{
+    va_list ap;
+    char *key;
+    int *i;
+    int rc = 0;
+
+    va_start (ap, obj);
+
+    key = va_arg (ap, char*), i = va_arg (ap, int*);
+    for (; key && i; key = va_arg (ap, char*), i = va_arg (ap, int*))
+        if ((*i = jsmn_get_value (msg, obj, key)) == -1)
+            rc = -1;
+
+    va_end (ap);
+
+    return rc;
+}
+
 char *jsmn_tokdup (const char *msg, jsmntok_t *tok)
 {
     size_t len;

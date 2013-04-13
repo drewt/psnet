@@ -108,13 +108,8 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
     char v;
     long lport;
 
-    if ((hops = jsmn_get_value (msg, tok, "hops")) == -1)
-        return;
-
-    if ((hop_port = jsmn_get_value (msg, tok, "hop-port")) == -1)
-        return;
-
-    if ((id = jsmn_get_value (msg, tok, "id")) == -1)
+    if (jsmn_get_values (msg, tok, "hops", &hops, "hop-port", &hop_port,
+            "id", &id, (void*) NULL) == -1)
         return;
 
     v = msg[tok[hops].start];

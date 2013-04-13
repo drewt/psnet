@@ -69,6 +69,7 @@ jsmnerr_t jsmn_parse(jsmn_parser *parser, const char *js,
 #include <string.h>
 
 int jsmn_get_value (const char *msg, jsmntok_t *tok, const char *key);
+int jsmn_get_values (const char *msg, jsmntok_t *obj, ...);
 char *jsmn_tokdup (const char *msg, jsmntok_t *tok);
 
 static inline int jsmn_toklen (jsmntok_t *tok)
