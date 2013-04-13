@@ -7,18 +7,6 @@
 #include <netinet/in.h>
 #endif
 
-#define TCP_MSG_MAX 512
-
-/* (TCP) connection info */
-struct conn_info {
-    int sock;
-    struct sockaddr_storage addr;
-    char msg[TCP_MSG_MAX];
-#ifdef PSNETLOG
-    char paddr[INET6_ADDRSTRLEN];
-#endif
-};
-
 /* the number of service threads currently running */
 int tcp_threads;
 pthread_mutex_t tcp_threads_lock;

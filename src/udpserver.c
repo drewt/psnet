@@ -95,7 +95,7 @@ _Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*))
     for(;;) {
         msg = malloc (sizeof (struct msg_info));
         sin_size = sizeof (struct sockaddr_in);
-        if ((rc = recvfrom (sock, msg->msg, UDP_MSG_MAX-1, 0,
+        if ((rc = recvfrom (sock, msg->msg, MSG_MAX-1, 0,
                     (struct sockaddr*) &msg->addr, &sin_size)) == -1) {
             perror ("recvfrom");
             continue;

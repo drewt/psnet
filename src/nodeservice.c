@@ -46,7 +46,7 @@ static const char *psnode_strerror[] = {
 /*-----------------------------------------------------------------------------
  * Process an info request */
 //-----------------------------------------------------------------------------
-static void process_info (struct conn_info *ci, const char *msg, jsmntok_t *tok,
+static void process_info (struct msg_info *mi, const char *msg, jsmntok_t *tok,
         size_t ntok)
 {
     struct response_node head, body;
@@ -54,7 +54,7 @@ static void process_info (struct conn_info *ci, const char *msg, jsmntok_t *tok,
     // TODO
     make_simple_response (&body, "{\"name\":\"myname\"}", 17);
     make_response_with_body (&head, body.next);
-    send_response (ci->sock, head.next);
+    send_response (mi->sock, head.next);
     free_response (head.next);
 }
 
@@ -176,34 +176,34 @@ static int parse_message (const char *msg, jsmntok_t *tok, size_t *ntok)
 //-----------------------------------------------------------------------------
 static void *handle_connection (void *data)
 {
-    struct conn_info *ci = data;
+    struct msg_info *mi = data;
     jsmntok_t tok[256];
     size_t ntok = 256;
     int method;
 
     for(;;) {
 
-        if (!tcp_read_message (ci->sock, ci->msg))
+        if (!tcp_read_message (mi->sock, mi->msg))
             break; // connection closed by client
 
         // dispatch
-        if ((method = parse_message (ci->msg, tok, &ntok)) == -1)
-            node_error (ci->sock, ENOMETHOD);
-        else if (jsmn_tokeq (ci->msg, &tok[method], "info"))
-            process_info (ci, ci->msg, tok, ntok);
+        if ((method = parse_message (mi->msg, tok, &ntok)) == -1)
+            node_error (mi->sock, ENOMETHOD);
+        else if (jsmn_tokeq (mi->msg, &tok[method], "info"))
+            process_info (mi, mi->msg, tok, ntok);
         else
-            node_error (ci->sock, EBADMETHOD);
+            node_error (mi->sock, EBADMETHOD);
     }
 
     // clean up
-    close (ci->sock);
+    close (mi->sock);
     pthread_mutex_lock (&tcp_threads_lock);
     tcp_threads--;
     pthread_mutex_unlock (&tcp_threads_lock);
 #ifdef PSNETLOG
-    printf ("D %s\n", ci->paddr);
+    printf ("D %s\n", mi->paddr);
 #endif
-    free (ci);
+    free (mi);
     pthread_exit (NULL);
 }
 

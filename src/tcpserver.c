@@ -130,14 +130,14 @@ int tcp_server_init (char *port)
 _Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*))
 {
     socklen_t sin_size;
-    struct conn_info *targ;
+    struct msg_info *targ;
     pthread_t tid;
 
     struct timeval tv = { .tv_sec = 30, .tv_usec = 0 };
 
     for (;;) {
 
-        targ = malloc (sizeof (struct conn_info));
+        targ = malloc (sizeof (struct msg_info));
 
         // wait for a connection
         sin_size = sizeof (targ->addr);

@@ -21,9 +21,22 @@
 #define PORT_MAX 65535
 #define PORT_STRLEN 5
 
+#define MSG_MAX 512
+
 #ifdef DAEMON
 void daemonize (void);
 #endif
+
+struct msg_info {
+    int sock;
+    int socktype;
+    size_t len;
+    struct sockaddr_storage addr;
+    char msg[MSG_MAX];
+#ifdef PSNETLOG
+    char paddr[INET6_ADDRSTRLEN];
+#endif
+};
 
 static inline void *get_in_addr (const struct sockaddr *sa)
 {

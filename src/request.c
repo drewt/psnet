@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 
+#include "common.h"
 #include "tcp.h"
 
 /* the message delimiter sequence */
@@ -19,7 +20,7 @@ size_t tcp_read_message (int sock, char *msg_buf)
     size_t i, delim_pos;
     ssize_t rv;
 
-    for (i = 0, delim_pos = 0; i < TCP_MSG_MAX-1 && delim_pos < delim.len; i++) {
+    for (i = 0, delim_pos = 0; i < MSG_MAX-1 && delim_pos < delim.len; i++) {
 
         signed char c;
         if ((rv = recv (sock, &c, 1, 0)) == -1)

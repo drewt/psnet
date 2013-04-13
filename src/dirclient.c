@@ -99,7 +99,7 @@ static int tcp_send_command (char **dest, const char *cmd, const char *host,
     int sockfd, numbytes;
     struct addrinfo hints, *servinfo, *p;
     int rv;
-    char msg[TCP_MSG_MAX];
+    char msg[MSG_MAX];
 
     memset (&hints, 0, sizeof (hints));
     hints.ai_family = AF_UNSPEC;

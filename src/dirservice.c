@@ -63,7 +63,7 @@ static void process_disconnect (struct msg_info *mi, char *port)
 /*-----------------------------------------------------------------------------
  * Process a 'LIST [n]' command */
 //-----------------------------------------------------------------------------
-static void process_list (struct conn_info *ci, char *args)
+static void process_list (struct msg_info *mi, char *args)
 {
     struct response_node head;
     struct response_node *jlist;
@@ -71,26 +71,26 @@ static void process_list (struct conn_info *ci, char *args)
     
     n = strtok_r (args, REQ_DELIM, &p);
     if (n == NULL) {
-        dir_error (ci->sock, ENONUM);
+        dir_error (mi->sock, ENONUM);
         return;
     }
     if (clients_to_json (&jlist, NULL, n)) {
-        dir_error (ci->sock, EBADNUM);
+        dir_error (mi->sock, EBADNUM);
         return;
     }
 
     make_response_with_body (&head, jlist);
 #ifdef PSNETLOG
-    printf (ANSI_YELLOW "L %s\n" ANSI_RESET, ci->paddr);
+    printf (ANSI_YELLOW "L %s\n" ANSI_RESET, mi->paddr);
 #endif
-    send_response (ci->sock, head.next);
+    send_response (mi->sock, head.next);
     free_response (head.next);
 }
 
 /*-----------------------------------------------------------------------------
  * Process a 'DISCOVER [port] [n]' command */
 //-----------------------------------------------------------------------------
-static void process_discover (struct conn_info *ci, char *args)
+static void process_discover (struct msg_info *mi, char *args)
 {
     struct response_node response_head;
     struct response_node *jlist;
@@ -116,22 +116,22 @@ static void process_discover (struct conn_info *ci, char *args)
         goto bail_error;
     }
 
-    set_in_port ((struct sockaddr*)&ci->addr, htons ((in_port_t) lport));
-    if (clients_to_json (&jlist, &ci->addr, n)) {
+    set_in_port ((struct sockaddr*)&mi->addr, htons ((in_port_t) lport));
+    if (clients_to_json (&jlist, &mi->addr, n)) {
         eno = EBADNUM;
         goto bail_error;
     }
 
     make_response_with_body (&response_head, jlist);
 #ifdef PSNETLOG
-    printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, ci->paddr, port);
+    printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, mi->paddr, port);
 #endif
-    send_response (ci->sock, response_head.next);
+    send_response (mi->sock, response_head.next);
     free_response (response_head.next);
     return;
 
 bail_error:
-    dir_error (ci->sock, eno);
+    dir_error (mi->sock, eno);
 }
 
 /*-----------------------------------------------------------------------------
@@ -139,42 +139,42 @@ bail_error:
 //-----------------------------------------------------------------------------
 static void *handle_connection (void *data)
 {
-    struct conn_info *ci = data;
+    struct msg_info *mi = data;
     char *cmd, *args, *p;
     int rv;
 
     for(;;) {
 
         // read message from socket
-        if (!(rv = tcp_read_message (ci->sock, ci->msg)))
+        if (!(rv = tcp_read_message (mi->sock, mi->msg)))
             break;
 
         // parse message
-        cmd  = strtok_r (ci->msg, REQ_DELIM, &p);
+        cmd  = strtok_r (mi->msg, REQ_DELIM, &p);
         args = strtok_r (NULL, "", &p);
 
         // dispatch
         if (!cmd)
-            dir_error (ci->sock, ENOCMD);
+            dir_error (mi->sock, ENOCMD);
         else if (cmd_equal (cmd, "LIST", 4))
-            process_list (ci, args);
+            process_list (mi, args);
         else if (cmd_equal (cmd, "DISCOVER", 8))
-            process_discover (ci, args);
+            process_discover (mi, args);
         else if (cmd_equal (cmd, "EXIT", 4))
             break;
         else
-            dir_error (ci->sock, EBADCMD);
+            dir_error (mi->sock, EBADCMD);
     }
 
     // clean up
-    close (ci->sock);
+    close (mi->sock);
     pthread_mutex_lock (&tcp_threads_lock);
     tcp_threads--;
     pthread_mutex_unlock (&tcp_threads_lock);
 #ifdef PSNETLOG
-    printf ("D %s\n", ci->paddr); fflush (stdout);
+    printf ("D %s\n", mi->paddr);
 #endif
-    free (ci);
+    free (mi);
     pthread_exit (NULL);
 }
 
