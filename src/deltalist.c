@@ -156,6 +156,9 @@ static _Noreturn void *clock_thread (void *data)
 {
     struct delta_list *table = data;
     unsigned int left;
+
+    pthread_detach (pthread_self ());
+
     for (;;) {
         for (left = table->resolution; left; left = sleep (left));
         delta_tick (table);

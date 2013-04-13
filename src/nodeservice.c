@@ -276,8 +276,7 @@ static void *udp_serve (void *data)
 {
     int sockfd;
 
-    if (pthread_detach (pthread_self ()))
-        perror ("pthread_detach");
+    pthread_detach (pthread_self ());
 
     sockfd = udp_server_init (data);
     udp_server_main (sockfd, 10000, handle_message);

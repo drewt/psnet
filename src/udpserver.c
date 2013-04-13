@@ -123,8 +123,8 @@ _Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*))
 
         if (pthread_create (&tid, NULL, cb, msg))
             perror ("pthread_create");
-        else if (pthread_detach (tid))
-            perror ("pthread_detach");
+        else
+            pthread_detach (tid);
     }
     close (sock);
 }

@@ -173,7 +173,7 @@ _Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*))
         // create a new thread to service the connection
         if (pthread_create (&tid, NULL, cb, targ))
             perror ("pthread_create");
-        if (pthread_detach (tid))
-            perror ("pthread_detach");
+        else
+            pthread_detach (tid);
     }
 }

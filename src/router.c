@@ -31,6 +31,8 @@ static _Noreturn void *router_update_thread (void *data)
 {
     struct dir_arg *a = data;
 
+    pthread_detach (pthread_self ());
+
     for(;;) {
         for (;;) {
             pthread_mutex_lock (&routers_lock);
@@ -55,6 +57,8 @@ static _Noreturn void *router_update_thread (void *data)
 static _Noreturn void *router_keepalive_thread (void *data)
 {
     struct dir_arg *a = data;
+
+    pthread_detach (pthread_self ());
 
     for(;;) {
         if (dir_connect (a->addr, a->port, a->listen) == -1)
