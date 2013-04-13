@@ -29,7 +29,7 @@ static struct {
     char *dir_port;
     char *listen_port;
 } settings = {
-    .dir_addr = "127.0.0.1",
+    .dir_addr = "psnet.no-ip.biz",
     .dir_port = "6666",
     .listen_port = "5555",
 };

@@ -13,9 +13,6 @@
 #include "response.h"
 #include "dirclient.h"
 
-#define DIR_ADDR "127.0.0.1"
-#define DIR_PORT "6666"
-
 #define OUTDEGREE 32
 
 static struct node_list routers;
