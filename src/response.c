@@ -79,6 +79,26 @@ void make_response_with_body (struct response_node *head,
     head->next = hdr;
 }
 
+void send_error (int sock, int no, const char *str)
+{
+#ifdef LISP_OUTPUT
+#define ERR_FMT "(:status \"error\" :code %d :reason \"%s\")"
+#define ERR_LEN 100
+#else
+#define ERR_FMT "{\"status\":\"error\",\"code\":%d,\"reason\":\"%s\"}"
+#define ERR_LEN 100
+#endif
+    int rv;
+    char s[ERR_LEN];
+    struct response_node head;
+    rv = sprintf (s, ERR_FMT, no, str);
+    make_simple_response (&head, s, rv);
+    send_response (sock, head.next);
+    free_response (head.next);
+#undef ERR_FMT
+#undef ERR_LEN
+}
+
 /*-----------------------------------------------------------------------------
  * Frees the memory associated with a response list */
 //-----------------------------------------------------------------------------

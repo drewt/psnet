@@ -23,6 +23,7 @@
 
 #define REQ_DELIM " \t\r\n"
 
+#define dir_error(sock, no) send_error (sock, no, psdir_strerror[no])
 enum input_errors { ENOCMD, ENONUM, ENOPORT, EBADCMD, EBADNUM, EBADPORT };
 static const char *psdir_strerror[] = {
     [ENOCMD]   = "no command given",
@@ -32,24 +33,6 @@ static const char *psdir_strerror[] = {
     [EBADNUM]  = "invalid argument 'n'",
     [EBADPORT] = "invalid argument 'port'" // 23
 };
-
-static void send_error (int sock, int no)
-{
-#ifdef LISP_OUTPUT
-#define ERR_FMT "(:status \"error\" :code %d :reason \"%s\")"
-#define ERR_LEN 100
-#else
-#define ERR_FMT "{\"status\":\"error\",\"code\":%d,\"reason\":\"%s\"}" 
-#define ERR_LEN 100
-#endif
-    int rv;
-    char s[ERR_LEN];
-    struct response_node head;
-    rv = sprintf (s, ERR_FMT, no, psdir_strerror[no]);
-    make_simple_response (&head, s, rv);
-    send_response (sock, head.next);
-    free_response (head.next);
-}
 
 /*-----------------------------------------------------------------------------
  * Process a 'CONNECT [port]' command */
@@ -80,7 +63,7 @@ static void process_disconnect (struct msg_info *mi, char *port)
 /*-----------------------------------------------------------------------------
  * Process a 'LIST [n]' command */
 //-----------------------------------------------------------------------------
-static void process_list (struct conn_info *info, char *args)
+static void process_list (struct conn_info *ci, char *args)
 {
     struct response_node head;
     struct response_node *jlist;
@@ -88,26 +71,26 @@ static void process_list (struct conn_info *info, char *args)
     
     n = strtok_r (args, REQ_DELIM, &p);
     if (n == NULL) {
-        send_error (info->sock, ENONUM);
+        dir_error (ci->sock, ENONUM);
         return;
     }
     if (clients_to_json (&jlist, NULL, n)) {
-        send_error (info->sock, EBADNUM);
+        dir_error (ci->sock, EBADNUM);
         return;
     }
 
     make_response_with_body (&head, jlist);
 #ifdef P2PSERV_LOG
-    printf (ANSI_YELLOW "L %s\n" ANSI_RESET, info->paddr);
+    printf (ANSI_YELLOW "L %s\n" ANSI_RESET, ci->paddr);
 #endif
-    send_response (info->sock, head.next);
+    send_response (ci->sock, head.next);
     free_response (head.next);
 }
 
 /*-----------------------------------------------------------------------------
  * Process a 'DISCOVER [port] [n]' command */
 //-----------------------------------------------------------------------------
-static void process_discover (struct conn_info *info, char *args)
+static void process_discover (struct conn_info *ci, char *args)
 {
     struct response_node response_head;
     struct response_node *jlist;
@@ -133,22 +116,22 @@ static void process_discover (struct conn_info *info, char *args)
         goto bail_error;
     }
 
-    set_in_port ((struct sockaddr*)&info->addr, htons ((in_port_t) lport));
-    if (clients_to_json (&jlist, &info->addr, n)) {
+    set_in_port ((struct sockaddr*)&ci->addr, htons ((in_port_t) lport));
+    if (clients_to_json (&jlist, &ci->addr, n)) {
         eno = EBADNUM;
         goto bail_error;
     }
 
     make_response_with_body (&response_head, jlist);
 #ifdef P2PSERV_LOG
-    printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, info->paddr, port);
+    printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, ci->paddr, port);
 #endif
-    send_response (info->sock, response_head.next);
+    send_response (ci->sock, response_head.next);
     free_response (response_head.next);
     return;
 
 bail_error:
-    send_error (info->sock, eno);
+    dir_error (ci->sock, eno);
 }
 
 /*-----------------------------------------------------------------------------
@@ -156,47 +139,48 @@ bail_error:
 //-----------------------------------------------------------------------------
 static void *handle_connection (void *data)
 {
-    struct conn_info *info = data;
-
-    char msg_buf[TCP_MSG_MAX];
+    struct conn_info *ci = data;
     char *cmd, *args, *p;
     int rv;
 
     for(;;) {
 
         // read message from socket
-        if (!(rv = tcp_read_message (info->sock, msg_buf)))
+        if (!(rv = tcp_read_message (ci->sock, ci->msg)))
             break;
 
         // parse message
-        cmd  = strtok_r (msg_buf, REQ_DELIM, &p);
+        cmd  = strtok_r (ci->msg, REQ_DELIM, &p);
         args = strtok_r (NULL, "", &p);
 
         // dispatch
         if (!cmd)
-            send_error (info->sock, ENOCMD);
+            dir_error (ci->sock, ENOCMD);
         else if (cmd_equal (cmd, "LIST", 4))
-            process_list (info, args);
+            process_list (ci, args);
         else if (cmd_equal (cmd, "DISCOVER", 8))
-            process_discover (info, args);
+            process_discover (ci, args);
         else if (cmd_equal (cmd, "EXIT", 4))
             break;
         else
-            send_error (info->sock, EBADCMD);
+            dir_error (ci->sock, EBADCMD);
     }
 
     // clean up
-    close (info->sock);
+    close (ci->sock);
     pthread_mutex_lock (&tcp_threads_lock);
     tcp_threads--;
     pthread_mutex_unlock (&tcp_threads_lock);
 #ifdef P2PSERV_LOG
-    printf ("D %s\n", info->paddr); fflush (stdout);
+    printf ("D %s\n", ci->paddr); fflush (stdout);
 #endif
-    free (info);
+    free (ci);
     pthread_exit (NULL);
 }
 
+/*-----------------------------------------------------------------------------
+ * Handles a UDP message (callback for udp_server_main()) */
+//-----------------------------------------------------------------------------
 static void *handle_message (void *data)
 {
     struct msg_info *mi = data;
@@ -237,7 +221,12 @@ static _Noreturn void usage (void)
 
 void *udp_serve (void *data)
 {
-    int sockfd = udp_server_init (data);
+    int sockfd;
+
+    if (pthread_detach (pthread_self ()))
+        perror ("pthread_detach");
+
+    sockfd = udp_server_init (data);
     udp_server_main (sockfd, 10000, handle_message);
 }
 
@@ -275,8 +264,6 @@ int main (int argc, char *argv[])
 
     if (pthread_create (&tid, NULL, udp_serve, argv[2]))
         perror ("pthread_create");
-    else if (pthread_detach (tid))
-        perror ("pthread_detach");
 
     sockfd = tcp_server_init (argv[2]);
     tcp_server_main (sockfd, max_threads, handle_connection);

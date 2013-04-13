@@ -16,6 +16,7 @@ void make_simple_response (struct response_node *prev, const char *data,
 void make_response_with_body (struct response_node *head,
         struct response_node *body);
 void free_response (struct response_node *node);
+void send_error (int sock, int no, const char *str);
 
 static inline void response_bad (struct response_node *prev) {
 #ifdef LISP_OUTPUT

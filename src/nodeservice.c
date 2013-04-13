@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -8,7 +9,9 @@
 #include <pthread.h>
 
 #include "common.h"
+#include "tcp.h"
 #include "udp.h"
+#include "response.h"
 #include "client.h"
 #include "router.h"
 #include "msgcache.h"
@@ -32,6 +35,28 @@ static struct {
     .listen_port = "5555",
     .max_threads = 10000
 };
+
+#define node_error(sock, no) send_error (sock, no, psnode_strerror[no])
+enum input_errors { ENOMETHOD, EBADMETHOD };
+static const char *psnode_strerror[] = {
+    [ENOMETHOD]  = "no method given",
+    [EBADMETHOD] = "unrecognized method"
+};
+
+/*-----------------------------------------------------------------------------
+ * Process an info request */
+//-----------------------------------------------------------------------------
+static void process_info (struct conn_info *ci, const char *msg, jsmntok_t *tok,
+        size_t ntok)
+{
+    struct response_node head, body;
+
+    // TODO
+    make_simple_response (&body, "{\"name\":\"myname\"}", 17);
+    make_response_with_body (&head, body.next);
+    send_response (ci->sock, head.next);
+    free_response (head.next);
+}
 
 /*-----------------------------------------------------------------------------
  * Process a 'ping' packet: send a pong */
@@ -133,44 +158,82 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 #endif
 }
 
+static int parse_message (const char *msg, jsmntok_t *tok, size_t *ntok)
+{
+    int rc;
+    jsmn_parser p;
+
+    jsmn_init (&p);
+    rc = jsmn_parse (&p, msg, tok, *ntok);
+    if (rc != JSMN_SUCCESS || tok[0].type != JSMN_OBJECT)
+        return -1;
+    *ntok =  p.toknext;
+    return jsmn_get_value (msg, tok, "method");
+}
+
+/*-----------------------------------------------------------------------------
+ * Handles a TCP connection (callback for tcp_server_main()) */
+//-----------------------------------------------------------------------------
+static void *handle_connection (void *data)
+{
+    struct conn_info *ci = data;
+    jsmntok_t tok[256];
+    size_t ntok = 256;
+    int method;
+
+    for(;;) {
+
+        if (!tcp_read_message (ci->sock, ci->msg))
+            break; // connection closed by client
+
+        // dispatch
+        if ((method = parse_message (ci->msg, tok, &ntok)) == -1)
+            node_error (ci->sock, ENOMETHOD);
+        else if (jsmn_tokeq (ci->msg, &tok[method], "info"))
+            process_info (ci, ci->msg, tok, ntok);
+        else
+            node_error (ci->sock, EBADMETHOD);
+    }
+
+    // clean up
+    close (ci->sock);
+    pthread_mutex_lock (&tcp_threads_lock);
+    tcp_threads--;
+    pthread_mutex_unlock (&tcp_threads_lock);
+#ifdef P2PSERV_LOG
+    printf ("D %s\n", ci->paddr);
+#endif
+    free (ci);
+    pthread_exit (NULL);
+}
+
 /*-----------------------------------------------------------------------------
  * Handles a UDP message (callback for udp_server_main()) */
 //-----------------------------------------------------------------------------
 static void *handle_message (void *data)
 {
-    struct msg_info *msg = data;
-    jsmn_parser p;
+    struct msg_info *mi = data;
     jsmntok_t tok[256];
-    int rc;
-
-    // parse message
-    jsmn_init (&p);
-    rc = jsmn_parse (&p, msg->msg, tok, 256);
-    if (rc != JSMN_SUCCESS || tok[0].type != JSMN_OBJECT)
-        goto cleanup;
-
-    // determine method
-    int method = jsmn_get_value (msg->msg, tok, "method");
-    if (method == -1)
-        goto cleanup;
+    size_t ntok = 256;
+    int method;
 
     // dispatch
-    if (jsmn_tokeq (msg->msg, &tok[method], "connect"))
-        process_connect (msg, tok, p.toknext);
-    else if (jsmn_tokeq (msg->msg, &tok[method], "broadcast"))
-        process_broadcast (msg, tok, p.toknext);
-    else if (jsmn_tokeq (msg->msg, &tok[method], "ping"))
-        process_ping (msg, tok, p.toknext);
-    else
-        printf ("junk packet: %s\n", msg->msg);
+    if ((method = parse_message (mi->msg, tok, &ntok)) == -1)
+        goto cleanup;
+    else if (jsmn_tokeq (mi->msg, &tok[method], "connect"))
+        process_connect (mi, tok, ntok);
+    else if (jsmn_tokeq (mi->msg, &tok[method], "broadcast"))
+        process_broadcast (mi, tok, ntok);
+    else if (jsmn_tokeq (mi->msg, &tok[method], "ping"))
+        process_ping (mi, tok, ntok);
 
 cleanup:
     pthread_mutex_lock (&udp_threads_lock);
     udp_threads--;
     pthread_mutex_unlock (&udp_threads_lock);
-    free (msg);
+    free (mi);
 #ifdef P2PSERV_LOG
-    printf ("-M %s\n", msg->paddr);
+    printf ("-M %s\n", mi->paddr);
 #endif
     pthread_exit (NULL);
 }
@@ -183,6 +246,17 @@ static _Noreturn void usage (void)
     puts ("usage: infranode [port]\n"
           "       where 'port' is the port number to listen on");
     exit (EXIT_FAILURE);
+}
+
+static void *udp_serve (void *data)
+{
+    int sockfd;
+
+    if (pthread_detach (pthread_self ()))
+        perror ("pthread_detach");
+
+    sockfd = udp_server_init (data);
+    udp_server_main (sockfd, 10000, handle_message);
 }
 
 static int ini_handler (void *user, const char *section, const char *name,
@@ -212,6 +286,7 @@ int main (int argc, char *argv[])
     char *endptr;
     int sockfd;
     long lport;
+    pthread_t tid;
 
     if (argc != 2)
         usage ();
@@ -245,6 +320,9 @@ init:
     msg_cache_init ();
     router_init (settings.dir_addr, settings.dir_port, settings.listen_port);
 
-    sockfd = udp_server_init (argv[1]);
-    udp_server_main (sockfd, settings.max_threads, handle_message);
+    if (pthread_create (&tid, NULL, udp_serve, argv[1]))
+        perror ("pthread_create");
+
+    sockfd = tcp_server_init (argv[1]);
+    tcp_server_main (sockfd, settings.max_threads, handle_connection);
 }
