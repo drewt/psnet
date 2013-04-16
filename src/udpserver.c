@@ -28,6 +28,8 @@ void udp_send_msg (const char *msg, size_t len, const struct sockaddr *dst)
 
     if (sendto (s, msg, len, 0, dst, sin_size) == -1)
         perror ("sendto");
+
+    close (s);
 }
 
 int udp_server_init (char *port)
