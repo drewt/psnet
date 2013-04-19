@@ -10,29 +10,13 @@ struct response_node {
     struct response_node *next;
 };
 
+int tcp_send_bytes (int sock, char *buf, size_t len);
 int send_response (int sock, struct response_node *node);
-void make_simple_response (struct response_node *prev, const char *data,
-        size_t data_size);
 void make_response_with_body (struct response_node *head,
         struct response_node *body);
 void free_response (struct response_node *node);
 void send_error (int sock, int no, const char *str);
-
-static inline void response_bad (struct response_node *prev) {
-#ifdef LISP_OUTPUT
-    make_simple_response (prev, "(:status \"error\")\r\n\r\n", 21);
-#else
-    make_simple_response (prev, "{\"status\":\"error\"}\r\n\r\n", 22);
-#endif
-}
-
-static inline void response_ok (struct response_node *prev) {
-#ifdef LISP_OUTPUT
-    make_simple_response (prev, "(:status \"okay\")\r\n\r\n", 20);
-#else
-    make_simple_response (prev, "{\"status\":\"okay\"}\r\n\r\n", 21);
-#endif
-}
+void send_ok (int sock);
 
 static inline bool cmd_equal (const char *str, const char *cmd, size_t len) {
     return !strncmp (str, cmd, len) && str[len] == '\0';

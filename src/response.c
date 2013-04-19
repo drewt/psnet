@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <string.h>
 #include <sys/socket.h>
 
@@ -8,7 +9,7 @@
 /*-----------------------------------------------------------------------------
  * Sends `len' bytes from `buf' into the given socket */
 //-----------------------------------------------------------------------------
-static int tcp_send_bytes (int sock, char *buf, size_t len)
+int tcp_send_bytes (int sock, char *buf, size_t len)
 {
     ssize_t rc;
     size_t sent = 0;
@@ -36,18 +37,6 @@ int send_response (int sock, struct response_node *node)
         node = node->next;
     }
     return 0;
-}
-
-/*-----------------------------------------------------------------------------
- * Constructs a link in the response list from the arguments */
-//-----------------------------------------------------------------------------
-void make_simple_response (struct response_node *prev, const char *data,
-        size_t data_size)
-{
-    prev->next = malloc (sizeof (struct response_node));
-    prev->next->data = strdup (data);
-    prev->next->size = data_size;
-    prev->next->next = NULL;
 }
 
 /*-----------------------------------------------------------------------------
@@ -90,13 +79,19 @@ void send_error (int sock, int no, const char *str)
 #endif
     int rv;
     char s[ERR_LEN];
-    struct response_node head;
     rv = sprintf (s, ERR_FMT, no, str);
-    make_simple_response (&head, s, rv);
-    send_response (sock, head.next);
-    free_response (head.next);
+    tcp_send_bytes (sock, s, rv);
 #undef ERR_FMT
 #undef ERR_LEN
+}
+
+void send_ok (int sock)
+{
+#ifdef LISP_OUTPUT
+    tcp_send_bytes (sock, "(:status \"okay\")\r\n\r\n", 20);
+#else
+    tcp_send_bytes (sock, "{\"status\":\"okay\"}\r\n\r\n", 21);
+#endif
 }
 
 /*-----------------------------------------------------------------------------

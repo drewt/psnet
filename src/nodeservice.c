@@ -22,8 +22,6 @@
 
 #define MAX_HOPS 4
 
-#define PONG_MAX (25 + PORT_STRLEN)
-
 static struct {
     char *dir_addr;
     char *dir_port;
@@ -50,15 +48,39 @@ pthread_mutex_t num_threads_lock;
 /*-----------------------------------------------------------------------------
  * Process an info request */
 //-----------------------------------------------------------------------------
+static void process_ip (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
+{
+    char addr[INET6_ADDRSTRLEN];
+    char hdr[29 + 5];
+    char rsp[INET6_ADDRSTRLEN + 9];
+    int hdr_len, rsp_len;
+
+    inet_ntop (mi->addr.ss_family, get_in_addr ((struct sockaddr*) &mi->addr),
+            addr, sizeof addr);
+    rsp_len = sprintf (rsp, "{\"ip\":\"%s\"}", addr);
+    hdr_len = sprintf (hdr, "{\"status\":\"okay\",\"size\":%d}\r\n\r\n",
+            rsp_len);
+
+    tcp_send_bytes (mi->sock, hdr, hdr_len);
+    tcp_send_bytes (mi->sock, rsp, rsp_len);
+}
+
+/*-----------------------------------------------------------------------------
+ * Process an info request */
+//-----------------------------------------------------------------------------
 static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
-    struct response_node head, body;
+#define rsp "{\"name\":\"generic psnet router\"}"
+    char hdr[29 + 5];
+    int hdr_len;
+    int rsp_len = sizeof rsp - 1;
 
-    // TODO
-    make_simple_response (&body, "{\"name\":\"myname\"}", 17);
-    make_response_with_body (&head, body.next);
-    send_response (mi->sock, head.next);
-    free_response (head.next);
+    hdr_len = sprintf (hdr, "{\"status\":\"okay\",\"size\":%d}\r\n\r\n",
+            rsp_len);
+
+    tcp_send_bytes (mi->sock, hdr, hdr_len);
+    tcp_send_bytes (mi->sock, rsp, rsp_len);
+#undef rsp
 }
 
 /*-----------------------------------------------------------------------------
@@ -66,10 +88,7 @@ static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 //-----------------------------------------------------------------------------
 static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    struct response_node head;
-    response_ok (&head);
-    send_response (mi->sock, head.next);
-    free_response (head.next);
+    send_ok (mi->sock);
 
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "P %s %d\n" ANSI_RESET, mi->paddr,
@@ -118,7 +137,7 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 
     v = msg[tok[hops].start];
     if (v < '0' || v >= '0' + MAX_HOPS - 1)
-        return;
+        return; // hop limit reached
     msg[tok[hops].start]++;
 
     lport = strtol (msg+tok[hop_port].start, NULL, 10);
@@ -211,6 +230,8 @@ static void *handle_connection (void *data)
         if ((method = parse_message (mi->msg, tok, &ntok)) == -1) {
             node_error (mi->sock, ENOMETHOD);
             break;
+        } else if (jsmn_tokeq (mi->msg, &tok[method], "ip")) {
+            process_ip (mi, tok, ntok);
         } else if (jsmn_tokeq (mi->msg, &tok[method], "info")) {
             process_info (mi, tok, ntok);
         } else if (jsmn_tokeq (mi->msg, &tok[method], "ping")) {
@@ -274,6 +295,9 @@ static _Noreturn void usage (void)
     exit (EXIT_FAILURE);
 }
 
+/*-----------------------------------------------------------------------------
+ * UDP server thread */
+//-----------------------------------------------------------------------------
 static void *udp_serve (void *data)
 {
     int sockfd;
@@ -284,6 +308,9 @@ static void *udp_serve (void *data)
     udp_server_main (sockfd, handle_message);
 }
 
+/*-----------------------------------------------------------------------------
+ * Callback for ini parser */
+//-----------------------------------------------------------------------------
 static int ini_handler (void *user, const char *section, const char *name,
         const char *value)
 {
@@ -301,11 +328,32 @@ static int ini_handler (void *user, const char *section, const char *name,
 }
 
 /*-----------------------------------------------------------------------------
+ * Attempts to read settings from an rc file at various locations */
+//-----------------------------------------------------------------------------
+static int read_rc (void)
+{
+    char *home, *path;
+
+    if (!ini_parse ("psnoderc", ini_handler, NULL))
+        return 0;
+
+    home = getenv ("HOME");
+    path = malloc (strlen (home) + 10);
+    sprintf (path, "%s%s", home, ".psnoderc");
+    if (!ini_parse (path, ini_handler, NULL))
+        return 0;
+
+    if (!ini_parse ("/etc/psnoderc", ini_handler, NULL))
+        return 0;
+
+    return -1;
+}
+
+/*-----------------------------------------------------------------------------
  * Main... */
 //-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
-    char *home, *path;
     char *endptr;
     int sockfd;
     long lport;
@@ -323,22 +371,8 @@ int main (int argc, char *argv[])
     }
     settings.listen_port= argv[1];
 
-    // read additional settings from configuration file
-    if (!ini_parse ("psnoderc", ini_handler, NULL))
-        goto init;
-
-    home = getenv ("HOME");
-    path = malloc (strlen (home) + 10);
-    sprintf (path, "%s%s", home, ".psnoderc");
-    if (!(lport = ini_parse (path, ini_handler, NULL)))
-        goto init;
-
-    if (!ini_parse ("/etc/psnoderc", ini_handler, NULL))
-        goto init;
-
-    fprintf (stderr, "error: failed to read psnoderc\n");
-
-init:
+    if (read_rc () == -1)
+        fprintf (stderr, "error: failed to read psnoderc\n");
 
 #ifdef DAEMON
     daemonize ();
