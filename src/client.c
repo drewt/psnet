@@ -17,6 +17,7 @@ static void delta_act (const void *client);
 static struct delta_list client_table = {
     .resolution = 1,
     .interval = 10,
+    .size = 0,
     .delta = 0,
     .delta_head = NULL,
     .delta_tail = NULL,
@@ -121,6 +122,13 @@ struct make_list_arg {
 //-----------------------------------------------------------------------------
 static int make_list (const void *data, void *arg)
 {
+#ifdef LISP_OUTPUT
+#define ELM_FMT "(:ip \"%s\" :port %d :ipv %d) "
+#define ELM_STRLEN 22 + INET6_ADDRSTRLEN + PORT_STRLEN + 1
+#else
+#define ELM_FMT "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},"
+#define ELM_STRLEN 25 + INET6_ADDRSTRLEN + PORT_STRLEN + 1
+#endif
     const struct sockaddr_storage *client = data;
     struct make_list_arg *ml_arg = arg;
     if (ml_arg->i >= ml_arg->n)
@@ -135,23 +143,18 @@ static int make_list (const void *data, void *arg)
 
     struct response_node *node = malloc (sizeof (struct response_node));
 
-    node->data = malloc (100);
-#ifdef LISP_OUTPUT
-    node->size = snprintf (node->data, 100, "(:ip \"%s\" :port %d :ipv %d) ",
-            addr, ntohs (get_in_port ((struct sockaddr*) client)),
+    node->data = malloc (ELM_STRLEN);
+    node->size = sprintf (node->data, ELM_FMT, addr,
+            ntohs (get_in_port ((struct sockaddr*) client)),
             client->ss_family == AF_INET ? 4 : 6);
-#else
-    node->size = snprintf (node->data, 100,
-            "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},",
-            addr, ntohs (get_in_port ((struct sockaddr*) client)),
-            client->ss_family == AF_INET ? 4 : 6);
-#endif
     node->next = NULL;
 
     ml_arg->prev->next = node;
     ml_arg->prev = node;
 
     return 0;
+#undef ELM_FMT
+#undef ELM_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
@@ -161,6 +164,13 @@ static int make_list (const void *data, void *arg)
 int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
         const char *n)
 {
+#ifdef LISP_OUTPUT
+#define LIST_OPEN  "("
+#define LIST_CLOSE ")"
+#else
+#define LIST_OPEN  "["
+#define LIST_CLOSE "]"
+#endif
     int num;
     char *endptr;
     struct make_list_arg arg;
@@ -173,12 +183,9 @@ int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
     arg.i = 0;
     arg.n = num;
     arg.ignore = ign;
+
     arg.prev = malloc (sizeof (struct response_node));
-#ifdef LISP_OUTPUT
-    arg.prev->data = strdup ("(");
-#else
-    arg.prev->data = strdup ("[");
-#endif
+    arg.prev->data = strdup (LIST_OPEN);
     arg.prev->size = 1;
     arg.prev->next = NULL;
     head = arg.prev;
@@ -187,17 +194,16 @@ int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
 
     if (arg.prev != head)
         arg.prev->size--; // ignore trailing separator
+
     arg.prev->next = malloc (sizeof (struct response_node));
-#ifdef LISP_OUTPUT
-    arg.prev->next->data = strdup (")\r\n");
-#else
-    arg.prev->next->data = strdup ("]\r\n");
-#endif
-    arg.prev->next->size = 3;
+    arg.prev->next->data = strdup (LIST_CLOSE "\r\n\r\n");
+    arg.prev->next->size = 5;
     arg.prev->next->next = NULL;
 
     *dest = head;
     return CL_OK;
+#undef LIST_OPEN
+#undef LIST_CLOSE
 }
 
 static int fwd_to_client (const void *data, void *arg)
@@ -211,4 +217,9 @@ int flood_to_clients (struct msg_info *mi)
 {
     delta_foreach (&client_table, fwd_to_client, mi);
     return CL_OK;
+}
+
+unsigned int client_list_size (void)
+{
+    return delta_size (&client_table);
 }

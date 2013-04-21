@@ -1,14 +1,6 @@
 #ifndef _PSNET_DELTALIST_H_
 #define _PSNET_DELTALIST_H_
 
-#ifndef EXP_INTERVAL
-#define EXP_INTERVAL 10
-#endif
-
-#ifndef INTERVAL_SECONDS
-#define INTERVAL_SECONDS 60
-#endif
-
 #ifndef HT_SIZE
 #define HT_SIZE 10
 #endif
@@ -18,6 +10,7 @@ typedef void data_t;
 struct delta_list {
     unsigned int resolution;       // seconds per tick
     unsigned int interval;         // expiration inverval (measured in ticks)
+    unsigned int size;             // number of elements in the list
     unsigned int delta;            // sum of all individual deltas
 
     struct delta_node *delta_head; // head of the delta list
@@ -43,5 +36,5 @@ const data_t *delta_get (struct delta_list *table, const data_t *data);
 void delta_clear (struct delta_list *table);
 void delta_foreach (struct delta_list *table,
         int (*fun)(const data_t *it, void *arg), void *arg);
-
+unsigned int delta_size (struct delta_list *table);
 #endif

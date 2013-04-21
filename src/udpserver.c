@@ -110,7 +110,6 @@ _Noreturn void udp_server_main (int sock, void *(*cb)(void*))
             continue;
         }
 
-        printf ("num_threads: %d\n", num_threads);
         num_threads++;
         pthread_mutex_unlock (&num_threads_lock);
 

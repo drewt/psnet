@@ -21,5 +21,6 @@ int remove_client (struct sockaddr_storage *addr, const char *port);
 int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
         const char *n);
 int flood_to_clients (struct msg_info *mi);
+unsigned int client_list_size (void);
 
 #endif

@@ -3,5 +3,6 @@
 
 void msg_cache_init (void);
 int cache_msg (char *id);
+unsigned int msg_cache_size (void);
 
 #endif

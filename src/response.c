@@ -24,6 +24,32 @@ int tcp_send_bytes (int sock, char *buf, size_t len)
     return 0;
 }
 
+void send_error (int sock, int no, const char *str)
+{
+#ifdef LISP_OUTPUT
+#define ERR_FMT "(:status \"error\" :code %d :reason \"%s\")\r\n\r\n"
+#define ERR_LEN 39 + 3 + PSNET_ERRSTRLEN
+#else
+#define ERR_FMT "{\"status\":\"error\",\"code\":%d,\"reason\":\"%s\"}\r\n\r\n"
+#define ERR_LEN 42 + 3 + PSNET_ERRSTRLEN
+#endif
+    int rv;
+    char s[ERR_LEN];
+    rv = sprintf (s, ERR_FMT, no, str);
+    tcp_send_bytes (sock, s, rv);
+#undef ERR_FMT
+#undef ERR_LEN
+}
+
+void send_ok (int sock)
+{
+#ifdef LISP_OUTPUT
+    tcp_send_bytes (sock, "(:status \"okay\")\r\n\r\n", 20);
+#else
+    tcp_send_bytes (sock, "{\"status\":\"okay\"}\r\n\r\n", 21);
+#endif
+}
+
 /*-----------------------------------------------------------------------------
  * Sends a linked list of response strings into the given socket */
 //-----------------------------------------------------------------------------
@@ -66,32 +92,6 @@ void make_response_with_body (struct response_node *head,
     hdr->next = body;
 
     head->next = hdr;
-}
-
-void send_error (int sock, int no, const char *str)
-{
-#ifdef LISP_OUTPUT
-#define ERR_FMT "(:status \"error\" :code %d :reason \"%s\")"
-#define ERR_LEN 100
-#else
-#define ERR_FMT "{\"status\":\"error\",\"code\":%d,\"reason\":\"%s\"}"
-#define ERR_LEN 100
-#endif
-    int rv;
-    char s[ERR_LEN];
-    rv = sprintf (s, ERR_FMT, no, str);
-    tcp_send_bytes (sock, s, rv);
-#undef ERR_FMT
-#undef ERR_LEN
-}
-
-void send_ok (int sock)
-{
-#ifdef LISP_OUTPUT
-    tcp_send_bytes (sock, "(:status \"okay\")\r\n\r\n", 20);
-#else
-    tcp_send_bytes (sock, "{\"status\":\"okay\"}\r\n\r\n", 21);
-#endif
 }
 
 /*-----------------------------------------------------------------------------

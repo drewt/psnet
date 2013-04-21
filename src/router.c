@@ -102,13 +102,13 @@ void routers_to_json (struct response_node **dst, int n)
 #ifdef LISP_OUTPUT
 #define LIST_OPEN  "("
 #define LIST_CLOSE ")"
-#define ELM_FMT "(:ip \"%s\" :port %d :ipv %d) " // 23
-#define MAX_LEN INET6_ADDRSTRLEN + PORT_STRLEN + 23
+#define ELM_FMT "(:ip \"%s\" :port %d :ipv %d) "
+#define ELM_STRLEN 23 + INET6_ADDRSTRLEN + PORT_STRLEN
 #else
 #define LIST_OPEN  "["
 #define LIST_CLOSE "]"
-#define ELM_FMT "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d}," //26
-#define MAX_LEN INET6_ADDRSTRLEN + PORT_STRLEN + 26
+#define ELM_FMT "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},"
+#define ELM_STRLEN 26 + INET6_ADDRSTRLEN + PORT_STRLEN
 #endif
     struct response_node *prev, *tmp;
     struct node_list *it;
@@ -126,8 +126,8 @@ void routers_to_json (struct response_node **dst, int n)
         tmp = malloc (sizeof (struct response_node));
         inet_ntop (it->addr.ss_family,
                 get_in_addr ((struct sockaddr*) &it->addr), addr, sizeof addr);
-        tmp->data = malloc (MAX_LEN);
-        tmp->size = snprintf (tmp->data, MAX_LEN, ELM_FMT, addr,
+        tmp->data = malloc (ELM_STRLEN);
+        tmp->size = snprintf (tmp->data, ELM_STRLEN, ELM_FMT, addr,
                 ntohs (get_in_port ((struct sockaddr*) &it->addr)),
                 it->addr.ss_family == AF_INET ? 4 : 6);
         tmp->next = NULL;
@@ -141,8 +141,8 @@ void routers_to_json (struct response_node **dst, int n)
     if (it != routers.next)
         prev->size--; // ignore trailing separator
     tmp = malloc (sizeof (struct response_node));
-    tmp->data = strdup (LIST_CLOSE);
-    tmp->size = 1;
+    tmp->data = strdup (LIST_CLOSE "\r\n\r\n");
+    tmp->size = 5;
     tmp->next = NULL;
     prev->next = tmp;
 #undef LIST_OPEN

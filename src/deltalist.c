@@ -115,6 +115,7 @@ static int delta_delete (struct delta_list *table, const data_t *data)
     // remove from delta list
     dl_remove_node (table, node);
 
+    table->size--;
     table->free ((data_t*)node->data);
     free (node);
 
@@ -193,6 +194,7 @@ void delta_insert (struct delta_list *table, const data_t *data)
         node->data = data;
         hash_insert (table, node);
         dl_insert_node (table, node);
+        table->size++;
     }
 
     pthread_mutex_unlock (&table->lock);
@@ -217,6 +219,7 @@ int delta_update (struct delta_list *table, const data_t *data)
         node = malloc (sizeof (struct delta_node));
         node->data = data;
         hash_insert (table, node);
+        table->size++;
         rc = 0;
     }
     dl_insert_node (table, node);
@@ -285,6 +288,7 @@ void delta_clear (struct delta_list *table)
         free (tmp);
     }
 
+    table->size = 0;
     table->delta = 0;
     table->delta_head = NULL;
     table->delta_tail = NULL;
@@ -310,4 +314,13 @@ void delta_foreach (struct delta_list *table,
             break;
     }
     pthread_mutex_unlock (&table->lock);
+}
+
+unsigned int delta_size (struct delta_list *table)
+{
+    unsigned int rv;
+    pthread_mutex_lock (&table->lock);
+    rv = table->size;
+    pthread_mutex_unlock (&table->lock);
+    return rv;
 }

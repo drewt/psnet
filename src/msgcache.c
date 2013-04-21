@@ -13,6 +13,7 @@ static void delta_act (const void *msg);
 static struct delta_list msg_cache = {
     .resolution = 1,
     .interval = 10,
+    .size = 0,
     .delta = 0,
     .delta_head = NULL,
     .delta_tail = NULL,
@@ -63,4 +64,9 @@ int cache_msg (char *id)
 void msg_cache_init (void)
 {
     delta_init (&msg_cache);
+}
+
+unsigned int msg_cache_size (void)
+{
+    return delta_size (&msg_cache);
 }

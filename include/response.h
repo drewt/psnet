@@ -1,7 +1,7 @@
 #ifndef _PSNET_RESPONSE_H_
 #define _PSNET_RESPONSE_H_
 
-#include <stdbool.h>
+#define PSNET_ERRSTRLEN 100
 
 /* node in linked list of response strings */
 struct response_node {
@@ -18,7 +18,7 @@ void free_response (struct response_node *node);
 void send_error (int sock, int no, const char *str);
 void send_ok (int sock);
 
-static inline bool cmd_equal (const char *str, const char *cmd, size_t len) {
+static inline int cmd_equal (const char *str, const char *cmd, size_t len) {
     return !strncmp (str, cmd, len) && str[len] == '\0';
 }
 

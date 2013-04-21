@@ -20,7 +20,17 @@
 #include "jsmn.h"
 #include "ini.h"
 
+#define JSMN_NTOK 256
+
 #define MAX_HOPS 4
+
+#ifdef LISP_OUTPUT
+#define HDR_OK_FMT "(:status \"okay\" :size %d)\r\n\r\n"
+#define HDR_OK_STRLEN (27 + 5)
+#else
+#define HDR_OK_FMT "{\"status\":\"okay\",\"size\":%d}\r\n\r\n"
+#define HDR_OK_STRLEN (29 + 5)
+#endif
 
 static struct {
     char *dir_addr;
@@ -50,19 +60,26 @@ pthread_mutex_t num_threads_lock;
 //-----------------------------------------------------------------------------
 static void process_ip (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
+#ifdef LISP_OUTPUT
+#define RSP_FMT "(:ip \"%s\")\r\n\r\n"
+#else
+#define RSP_FMT "{\"ip\":\"%s\"}\r\n\r\n"
+#endif
+
     char addr[INET6_ADDRSTRLEN];
-    char hdr[29 + 5];
-    char rsp[INET6_ADDRSTRLEN + 9];
+    char hdr[HDR_OK_STRLEN];
+    char rsp[13 + INET6_ADDRSTRLEN];
     int hdr_len, rsp_len;
 
     inet_ntop (mi->addr.ss_family, get_in_addr ((struct sockaddr*) &mi->addr),
             addr, sizeof addr);
-    rsp_len = sprintf (rsp, "{\"ip\":\"%s\"}", addr);
-    hdr_len = sprintf (hdr, "{\"status\":\"okay\",\"size\":%d}\r\n\r\n",
-            rsp_len);
+    rsp_len = sprintf (rsp, RSP_FMT, addr);
+    hdr_len = sprintf (hdr, HDR_OK_FMT, rsp_len);
 
     tcp_send_bytes (mi->sock, hdr, hdr_len);
     tcp_send_bytes (mi->sock, rsp, rsp_len);
+
+#undef RSP_FMT
 }
 
 /*-----------------------------------------------------------------------------
@@ -70,17 +87,28 @@ static void process_ip (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 //-----------------------------------------------------------------------------
 static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
-#define rsp "{\"name\":\"generic psnet router\"}"
-    char hdr[29 + 5];
-    int hdr_len;
-    int rsp_len = sizeof rsp - 1;
+#ifdef LISP_OUTPUT
+#define INFO_FMT "(:name \"generic psnet router\" "\
+                  ":clients %d :cache-load %d)\r\n\r\n"
+#define INFO_STRLEN (57 + 10 + 10)
+#else
+#define INFO_FMT "{\"name\":\"generic psnet router\","\
+                  "\"clients\":%d,\"cache-load\":%d}\r\n\r\n"
+#define INFO_STRLEN (60 + 10 + 10)
+#endif
 
-    hdr_len = sprintf (hdr, "{\"status\":\"okay\",\"size\":%d}\r\n\r\n",
-            rsp_len);
+    char hdr[HDR_OK_STRLEN];
+    char rsp[INFO_STRLEN];
+    int hdr_len, rsp_len;
+
+    rsp_len = sprintf (rsp, INFO_FMT, client_list_size (), msg_cache_size ());
+    hdr_len = sprintf (hdr, HDR_OK_FMT, rsp_len);
 
     tcp_send_bytes (mi->sock, hdr, hdr_len);
     tcp_send_bytes (mi->sock, rsp, rsp_len);
-#undef rsp
+
+#undef INFO_FMT
+#undef INFO_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
@@ -217,8 +245,8 @@ static int parse_message (const char *msg, jsmntok_t *tok, size_t *ntok)
 static void *handle_connection (void *data)
 {
     struct msg_info *mi = data;
-    jsmntok_t tok[256];
-    size_t ntok = 256;
+    jsmntok_t tok[JSMN_NTOK];
+    size_t ntok = JSMN_NTOK;
     int method;
 
     for(;;) {
@@ -262,8 +290,8 @@ static void *handle_connection (void *data)
 static void *handle_message (void *data)
 {
     struct msg_info *mi = data;
-    jsmntok_t tok[256];
-    size_t ntok = 256;
+    jsmntok_t tok[JSMN_NTOK];
+    size_t ntok = JSMN_NTOK;
     int method;
 
     // dispatch
