@@ -1,0 +1,72 @@
+psnet - Pretty Simple Network
+
+psnet is an overlay network which provides unreliable broadcast services to
+clients.  Clients join the network (i.e. become a destination for broadcast
+messages from other clients) by sending keep-alive messages to one or more
+routers in the network.  They may then broadcast their own messages by sending
+them to a router.
+
+Addresses of the routers are made available by the 'directory' server.  This
+can be run at a well-known address for use by clients to bootstrap into the
+network.  Routers also use the directory to find other routers to forward their
+broadcast messages to.
+
+--- PROTOCOL ---
+
+The protocol is mostly JSON.  Eventually it will be 100% JSON.
+
+The basic structure of a broadcast message is:
+
+{
+    "method":"broadcast",
+    "hops":0,
+    "hop-port":"     ",   [<-- NOTE: this is mandatory!]
+    "data":[anything]
+}
+
+The "method" field is used throughout the protocol at both the router and the
+directory to specify the service which is being requested.
+
+"hops" should be set to 0 at the client (or perhaps higher, if reduced network
+penetration is desired).  It is used by the routers to prevent messages from
+floating around the network indefinitely.  Note that routers currently check
+only the first digit of this number.  This may change in the future.
+
+"hop-port" absolutely must be a string containing 5 spaces.  This is so that
+routers can overwrite this field without using extra memory to copy the message
+or otherwise doing anything fancy.  The field itself if used by routers to
+prevent short forwarding cycles.
+
+"data" is not strictly necessary, but presumably you want to actually send a
+message and not just metadata, in which case it would be a good idea to put the
+message in this field.  You could also make up your own fields, but this may
+break in future versions of the protocol.
+
+Currently routers only accept broadcast messages over UDP, though this is
+likely to change in the future.
+
+Keep-alive messages are as follows:
+
+{
+    "method":"connect",
+    "port":[port number]
+}
+
+"port" should be a valid port number.
+
+The interval at which keep-alive messages should be sent is determined by
+compile-time options.  These messages should be sent over UDP.
+
+Routers also support a "discover" command which can be used to find other
+routers in case the directory is unavailable.  This is of limited use to
+clients, and currently routers do not make use of it amongst themselves (though
+this is likely to change).
+
+{
+    "method":"discover",
+    "num":[number]
+}
+
+"num" specifies the number of routers to be returned.
+
+The directory supports... TODO
