@@ -24,6 +24,10 @@
 #include <netdb.h>
 #include <pthread.h>
 
+#define JSMN_STRICT
+#include "jsmn.h"
+#include "ini.h"
+
 #include "common.h"
 #include "tcp.h"
 #include "udp.h"
@@ -31,10 +35,6 @@
 #include "client.h"
 #include "router.h"
 #include "msgcache.h"
-
-#define JSMN_STRICT
-#include "jsmn.h"
-#include "ini.h"
 
 #define JSMN_NTOK 256
 
@@ -398,25 +398,31 @@ static int read_rc (void)
 //-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
-    char *endptr;
     int sockfd;
     long lport;
     pthread_t tid;
 
-    if (argc != 2)
+    if (argc > 2)
         usage ();
 
-    // read the port number from argv
-    endptr = NULL;
-    lport = strtol (argv[1], &endptr, 10);
-    if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0')) {
-        fprintf (stderr, "error: invalid port\n");
-        usage ();
+    // validate port number, if given on the command line
+    if (argc == 2) {
+        lport = strtol (argv[1], NULL, 10);
+        if (lport < PORT_MIN || lport > PORT_MAX) {
+            fprintf (stderr, "error: invalid port\n");
+            usage ();
+        }
+        settings.listen_port= argv[1];
     }
-    settings.listen_port= argv[1];
 
     if (read_rc () == -1)
-        fprintf (stderr, "error: failed to read psnoderc\n");
+        fprintf (stderr, "error: failed to read psnoderc\n"
+                         "using defaults:\n"
+                         "\tDirectory address: %s\n"
+                         "\tDirectory port:    %s\n"
+                         "\tListen port:       %s\n",
+                         settings.dir_addr, settings.dir_port,
+                         settings.listen_port);
 
 #ifdef DAEMON
     daemonize ();
@@ -429,9 +435,9 @@ int main (int argc, char *argv[])
     msg_cache_init ();
     router_init (settings.dir_addr, settings.dir_port, settings.listen_port);
 
-    if (pthread_create (&tid, NULL, udp_serve, argv[1]))
+    if (pthread_create (&tid, NULL, udp_serve, settings.listen_port))
         perror ("pthread_create");
 
-    sockfd = tcp_server_init (argv[1]);
+    sockfd = tcp_server_init (settings.listen_port);
     tcp_server_main (sockfd, handle_connection);
 }
