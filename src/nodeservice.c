@@ -168,12 +168,11 @@ static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 //-----------------------------------------------------------------------------
 static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    int hops, hop_port, id;
+    int hops, hop_port, id, port;
     char *msg = mi->msg;
     char *msgid;
     char *s, *d;
     char v;
-    long lport;
 
     if (jsmn_get_values (msg, tok, "hops", &hops, "hop-port", &hop_port,
             "id", &id, (void*) NULL) == -1)
@@ -184,8 +183,8 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
         return; // hop limit reached
     msg[tok[hops].start]++;
 
-    lport = strtol (msg+tok[hop_port].start, NULL, 10);
-    if (lport < PORT_MIN || lport > PORT_MAX)
+    port = atoi (msg + tok[hop_port].start);
+    if (port < PORT_MIN || port > PORT_MAX)
         return;
 
     msgid = jsmn_tokdup (msg, &tok[id]);
@@ -194,7 +193,7 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
         return;
     }
 
-    set_in_port ((struct sockaddr*) &mi->addr, htons ((in_port_t) lport));
+    set_in_port ((struct sockaddr*) &mi->addr, htons ((in_port_t) port));
 
     // set hop-port to our listen port
     // XXX: hop-port should be a string of length PORT_STRLEN so there is space
@@ -205,7 +204,6 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
     flood_message (mi);
 
 #ifdef PSNETLOG
-    printf ("%s", msg);
     printf (ANSI_YELLOW "F %s\n" ANSI_RESET, msgid);
 #endif
 }
@@ -255,21 +253,25 @@ static void *handle_connection (void *data)
             break; // connection closed by client
 
         // dispatch
+        #define cmd_equal(cmd) jsmn_tokeq (mi->msg, &tok[method], cmd)
         if ((method = parse_message (mi->msg, tok, &ntok)) == -1) {
             node_error (mi->sock, ENOMETHOD);
             break;
-        } else if (jsmn_tokeq (mi->msg, &tok[method], "ip")) {
+        } else if (cmd_equal ("broadcast")) {
+            process_broadcast (mi, tok, ntok);
+        } else if (cmd_equal ("ip")) {
             process_ip (mi, tok, ntok);
-        } else if (jsmn_tokeq (mi->msg, &tok[method], "info")) {
+        } else if (cmd_equal ("info")) {
             process_info (mi, tok, ntok);
-        } else if (jsmn_tokeq (mi->msg, &tok[method], "ping")) {
+        } else if (cmd_equal ("ping")) {
             process_ping (mi, tok, ntok);
-        } else if (jsmn_tokeq (mi->msg, &tok[method], "discover")) {
+        } else if (cmd_equal ("discover")) {
             process_discover (mi, tok, ntok);
         } else {
             node_error (mi->sock, EBADMETHOD);
             break;
         }
+        #undef cmd_equal
     }
 
     // clean up
@@ -295,12 +297,14 @@ static void *handle_message (void *data)
     int method;
 
     // dispatch
+    #define cmd_equal(cmd) jsmn_tokeq (mi->msg, &tok[method], cmd)
     if ((method = parse_message (mi->msg, tok, &ntok)) == -1)
         goto cleanup;
-    else if (jsmn_tokeq (mi->msg, &tok[method], "connect"))
+    else if (cmd_equal ("connect"))
         process_connect (mi, tok, ntok);
-    else if (jsmn_tokeq (mi->msg, &tok[method], "broadcast"))
+    else if (cmd_equal ("broadcast"))
         process_broadcast (mi, tok, ntok);
+    #undef cmd_equal
 
 cleanup:
     pthread_mutex_lock (&num_threads_lock);

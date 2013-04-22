@@ -40,8 +40,9 @@ message and not just metadata, in which case it would be a good idea to put the
 message in this field.  You could also make up your own fields, but this may
 break in future versions of the protocol.
 
-Currently routers only accept broadcast messages over UDP, though this is
-likely to change in the future.
+Routers accept broadcast messages over both TCP and UDP.  It's probably a good
+idea to send them over TCP to ensure they make it into the network, though
+subsequent hops (between routers and from routers to clients) will use UDP.
 
 Keep-alive messages are as follows:
 
