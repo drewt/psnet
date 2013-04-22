@@ -1,3 +1,5 @@
+/* Copyright 2013 Drew Thoreson */
+
 #include <stdlib.h>
 
 #include "jsmn.h"

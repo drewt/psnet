@@ -1,3 +1,5 @@
+/* Copyright 2013 Drew Thoreson */
+
 #ifndef __JSMN_H_
 #define __JSMN_H_
 

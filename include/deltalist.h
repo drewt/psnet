@@ -1,3 +1,5 @@
+/* Copyright 2013 Drew Thoreson */
+
 /* This file is part of psnet
  *
  * This program is free software: you can redistribute it and/or modify it
