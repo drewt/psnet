@@ -43,41 +43,6 @@
 
 #define LOG_FILE_PATH "/tmp/p2pservlog"
 
-#ifdef DAEMON
-/*-----------------------------------------------------------------------------
- * Run the server in the background */
-//-----------------------------------------------------------------------------
-void daemonize (void)
-{
-    pid_t pid, sid;
-
-    pid = fork ();
-    if (pid == -1) {
-        perror ("fork");
-        exit (EXIT_FAILURE);
-    }
-    if (pid > 0)
-        exit (EXIT_SUCCESS);
-
-    umask (0);
-
-    freopen (LOG_FILE_PATH, "w", stdout);
-    freopen (LOG_FILE_PATH, "w", stderr);
-    fclose (stdin);
-
-    sid = setsid ();
-    if (sid == -1) {
-        perror ("setsid");
-        exit (EXIT_FAILURE);
-    }
-
-    if (chdir ("/") == -1) {
-        perror ("chdir");
-        exit (EXIT_FAILURE);
-    }
-}
-#endif
-
 /*-----------------------------------------------------------------------------
  * Initialize the server to listen on the given port */
 //-----------------------------------------------------------------------------

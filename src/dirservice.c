@@ -33,6 +33,8 @@
 #include <netinet/in.h>
 #include <time.h>
 
+#include "jsmn.h"
+
 #include "common.h"
 #include "tcp.h"
 #include "udp.h"
@@ -42,14 +44,14 @@
 #define REQ_DELIM " \t\r\n"
 
 #define dir_error(sock, no) send_error (sock, no, psdir_strerror[no])
-enum input_errors { ENOCMD, ENONUM, ENOPORT, EBADCMD, EBADNUM, EBADPORT };
+enum input_errors { ENOMETHOD,ENONUM,ENOPORT,EBADMETHOD,EBADNUM,EBADPORT };
 static const char *psdir_strerror[] = {
-    [ENOCMD]   = "no command given",
-    [ENONUM]   = "missing argument 'n'",
-    [ENOPORT]  = "missing argument 'port'",
-    [EBADCMD]  = "invalid command",
-    [EBADNUM]  = "invalid argument 'n'",
-    [EBADPORT] = "invalid argument 'port'" // 23
+    [ENOMETHOD]  = "no method given",
+    [ENONUM]     = "missing argument 'num'",
+    [ENOPORT]    = "missing argument 'port'",
+    [EBADMETHOD] = "unrecognized method",
+    [EBADNUM]    = "invalid argument 'num'",
+    [EBADPORT]   = "invalid argument 'port'" // 23
 };
 
 int max_threads;
@@ -59,101 +61,113 @@ pthread_mutex_t num_threads_lock;
 /*-----------------------------------------------------------------------------
  * Process a 'CONNECT [port]' command */
 //-----------------------------------------------------------------------------
-static void process_connect (struct msg_info *mi, char *port)
+static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    if (add_client (&mi->addr, port))
+    int port;
+
+    if ((port = jsmn_get_value (mi->msg, tok, "port")) == -1)
+        return;
+
+    mi->msg[tok[port].end] = '\0';
+
+    if (add_client (&mi->addr, mi->msg + tok[port].start))
         return;
 
 #ifdef PSNETLOG
-    printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, mi->paddr, port);
+    printf (ANSI_GREEN "+ %s %s\n" ANSI_RESET, mi->paddr,
+            mi->msg + tok[port].start);
 #endif
 }
 
 /*-----------------------------------------------------------------------------
  * Process a 'DISCONNECT [port]' command */
 //-----------------------------------------------------------------------------
-static void process_disconnect (struct msg_info *mi, char *port)
+static void process_disconnect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    if (remove_client (&mi->addr, port))
+    int port;
+
+    if ((port =  jsmn_get_value (mi->msg, tok, "port")) == -1)
+        return;
+
+    mi->msg[tok[port].end] = '\0';
+
+    if (remove_client (&mi->addr, mi->msg + tok[port].start))
         return;
 
 #ifdef PSNETLOG
-    printf (ANSI_RED "- %s %s\n" ANSI_RESET, mi->paddr, port);
+    printf (ANSI_RED "- %s %s\n" ANSI_RESET, mi->paddr,
+            mi->msg + tok[port].start);
 #endif
 }
 
 /*-----------------------------------------------------------------------------
  * Process a 'LIST [n]' command */
 //-----------------------------------------------------------------------------
-static void process_list (struct msg_info *mi, char *args)
+static void process_list (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
     struct response_node head;
     struct response_node *jlist;
-    char *n, *p;
-    
-    n = strtok_r (args, REQ_DELIM, &p);
-    if (n == NULL) {
+    int num;
+ 
+    if ((num = jsmn_get_value (mi->msg, tok, "num")) == -1) {
         dir_error (mi->sock, ENONUM);
         return;
     }
-    if (clients_to_json (&jlist, NULL, n)) {
+    mi->msg[tok[num].end] = '\0';
+
+    if (clients_to_json (&jlist, NULL, mi->msg + tok[num].start)) {
         dir_error (mi->sock, EBADNUM);
         return;
     }
 
     make_response_with_body (&head, jlist);
+    send_response (mi->sock, head.next);
+    free_response (head.next);
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "L %s\n" ANSI_RESET, mi->paddr);
 #endif
-    send_response (mi->sock, head.next);
-    free_response (head.next);
 }
 
 /*-----------------------------------------------------------------------------
  * Process a 'DISCOVER [port] [n]' command */
 //-----------------------------------------------------------------------------
-static void process_discover (struct msg_info *mi, char *args)
+static void process_discover (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
     struct response_node head;
     struct response_node *jlist;
-    char *port, *n, *p;
-    char *endptr;
-    long lport;
-    int eno;
-    
-    port = strtok_r (args, REQ_DELIM, &p);
-    n    = strtok_r (NULL, REQ_DELIM, &p);
-    if (port == NULL) {
-        eno = ENOPORT;
-        goto bail_error;
+    int num, port;
+    int iport;
+
+    if ((num = jsmn_get_value (mi->msg, tok, "num")) == -1) {
+        dir_error (mi->sock, ENONUM);
+        return;
     }
-    if (n == NULL) {
-        eno = ENONUM;
-        goto bail_error;
+    mi->msg[tok[num].end] = '\0';
+    if ((port = jsmn_get_value (mi->msg, tok, "port")) == -1) {
+        dir_error (mi->sock, ENOPORT);
+        return;
+    }
+    mi->msg[tok[port].end] = '\0';
+
+    iport = atoi (mi->msg + tok[port].start);
+    if (iport < PORT_MIN || iport > PORT_MAX) {
+        dir_error (mi->sock, EBADPORT);
+        return;
     }
 
-    lport = strtol (port, &endptr, 10);
-    if (lport < PORT_MIN || lport > PORT_MAX || (endptr && *endptr != '\0')) {
-        eno = EBADPORT;
-        goto bail_error;
-    }
-
-    set_in_port ((struct sockaddr*)&mi->addr, htons ((in_port_t) lport));
-    if (clients_to_json (&jlist, &mi->addr, n)) {
-        eno = EBADNUM;
-        goto bail_error;
+    set_in_port ((struct sockaddr*)&mi->addr, htons ((in_port_t) iport));
+    if (clients_to_json (&jlist, &mi->addr, mi->msg + tok[num].start)) {
+        dir_error (mi->sock, EBADNUM);
+        return;
     }
 
     make_response_with_body (&head, jlist);
-#ifdef PSNETLOG
-    printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, mi->paddr, port);
-#endif
     send_response (mi->sock, head.next);
     free_response (head.next);
-    return;
-
-bail_error:
-    dir_error (mi->sock, eno);
+#ifdef PSNETLOG
+    printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, mi->paddr,
+            mi->msg + tok[port].start);
+#endif
 }
 
 /*-----------------------------------------------------------------------------
@@ -162,33 +176,29 @@ bail_error:
 static void *handle_connection (void *data)
 {
     struct msg_info *mi = data;
-    char *cmd, *args, *p;
-    int rv;
+    jsmntok_t tok[JSMN_NTOK];
+    size_t ntok = JSMN_NTOK;
+    int method;
 
     for(;;) {
 
-        // read message from socket
-        if (!(rv = tcp_read_message (mi->sock, mi->msg)))
-            break;
-
-        // parse message
-        cmd  = strtok_r (mi->msg, REQ_DELIM, &p);
-        args = strtok_r (NULL, "", &p);
+        if (!tcp_read_message (mi->sock, mi->msg))
+            break; // connection closed by client
 
         // dispatch
-        if (!cmd) {
-            dir_error (mi->sock, ENOCMD);
+        #define cmd_equal(cmd) jsmn_tokeq (mi->msg, &tok[method], cmd)
+        if ((method = parse_message (mi->msg, tok, &ntok)) == -1) {
+            dir_error (mi->sock, ENOMETHOD);
             break;
-        } else if (cmd_equal (cmd, "LIST", 4)) {
-            process_list (mi, args);
-        } else if (cmd_equal (cmd, "DISCOVER", 8)) {
-            process_discover (mi, args);
-        } else if (cmd_equal (cmd, "EXIT", 4)) {
-            break;
+        } else if (cmd_equal ("list")) {
+            process_list (mi, tok, ntok);
+        } else if (cmd_equal ("discover")) {
+            process_discover (mi, tok, ntok);
         } else {
-            dir_error (mi->sock, EBADCMD);
+            dir_error (mi->sock, EBADMETHOD);
             break;
         }
+        #undef cmd_equal
     }
 
     // clean up
@@ -209,18 +219,19 @@ static void *handle_connection (void *data)
 static void *handle_message (void *data)
 {
     struct msg_info *mi = data;
-    char *cmd, *port, *p;
+    jsmntok_t tok[JSMN_NTOK];
+    size_t ntok = JSMN_NTOK;
+    int method;
 
-    // parse message
-    cmd  = strtok_r (mi->msg, REQ_DELIM, &p);
-    port = strtok_r (NULL, REQ_DELIM, &p);
-
-    if (!cmd || !port)
+    // dispatch
+    #define cmd_equal(cmd) jsmn_tokeq (mi->msg, &tok[method], cmd)
+    if ((method = parse_message (mi->msg, tok, &ntok)) == -1)
         goto cleanup;
-    else if (cmd_equal (cmd, "CONNECT", 7))
-        process_connect (mi, port);
-    else if (cmd_equal (cmd, "DISCONNECT", 10))
-        process_disconnect (mi, port);
+    else if (cmd_equal ("connect"))
+        process_connect (mi, tok, ntok);
+    else if (cmd_equal ("disconnect"))
+        process_disconnect (mi, tok, ntok);
+    #undef cmd_equal
 
 cleanup:
     pthread_mutex_lock (&num_threads_lock);

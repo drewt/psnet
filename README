@@ -13,8 +13,6 @@ broadcast messages to.
 
 --- PROTOCOL ---
 
-The protocol is mostly JSON.  Eventually it will be 100% JSON.
-
 The basic structure of a broadcast message is:
 
 {

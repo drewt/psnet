@@ -114,7 +114,7 @@ static int tcp_send_command (char **dest, const char *cmd, const char *host,
         const char *port, int *status)
 {
     size_t size;
-    int sockfd, numbytes;
+    int sockfd;
     struct addrinfo hints, *servinfo, *p;
     int rv;
     char msg[MSG_MAX];
@@ -149,20 +149,16 @@ static int tcp_send_command (char **dest, const char *cmd, const char *host,
 
     freeaddrinfo (servinfo);
 
-    if ((numbytes = send (sockfd, cmd, strlen (cmd), 0)) == -1) {
+    if ((rv = send (sockfd, cmd, strlen (cmd), 0)) == -1) {
         perror ("send");
-        rv = -1;
         goto cleanup;
     }
 
-    if (!(rv = tcp_read_message (sockfd, msg))) {
-        rv = 0;
+    if ((rv = tcp_read_message (sockfd, msg)) == 0)
         goto cleanup;
-    }
 
-    if (parse_header (status, &size, msg)) {
+    if ((rv = parse_header (status, &size, msg)) == -1) {
         fprintf (stderr, "invalid header from directory server\n");
-        rv = -1;
         goto cleanup;
     }
 
@@ -182,10 +178,15 @@ static int tcp_send_command (char **dest, const char *cmd, const char *host,
         goto cleanup;
     }
 
+    // read message body
     *dest = malloc (size+1);
-    if ((rv = tcp_read_bytes (sockfd, *dest, size)) == -1)
+    if ((rv = tcp_read_bytes (sockfd, *dest, size)) == -1) {
         fprintf (stderr, "send_command: failed to read message body\n");
-    else if ((size_t) rv < size)
+        free (*dest);
+        goto cleanup;
+    }
+
+    if ((size_t) rv < size)
         fprintf (stderr, "directory sent fewer than expected bytes\n");
     (*dest)[rv] = '\0';
 
@@ -201,12 +202,12 @@ cleanup:
 int dir_discover (struct node_list *prev, char *host, char *host_port,
         char *listen_port, int n)
 {
-#define DISCOVER_STRLEN (20 + PORT_STRLEN)
     int status;
     char *list;
-    char cmd[DISCOVER_STRLEN];
+    char cmd[40 + 5 + PORT_STRLEN];
 
-    snprintf (cmd, DISCOVER_STRLEN, "DISCOVER %s %d\r\n\r\n", listen_port, n);
+    sprintf (cmd, "{\"method\":\"discover\",\"num\":%d,\"port\":%s}\r\n\r\n",
+            n, listen_port);
     if (tcp_send_command (&list, cmd, host, host_port, &status) < 1) {
         fprintf (stderr, "get_list: failed to retrieve list from directory\n");
         return -1;
@@ -219,7 +220,6 @@ int dir_discover (struct node_list *prev, char *host, char *host_port,
 
     free (list);
     return 0;
-#undef DISCOVER_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
@@ -228,12 +228,11 @@ int dir_discover (struct node_list *prev, char *host, char *host_port,
 //-----------------------------------------------------------------------------
 int dir_list (struct node_list *prev, char *host, char *port, int n)
 {
-#define LIST_STRLEN 15
     int status;
     char *list;
-    char cmd[LIST_STRLEN];
+    char cmd[28 + 5];
 
-    snprintf (cmd, LIST_STRLEN, "LIST %d\r\n\r\n", n);
+    sprintf (cmd, "{\"method\":\"list\",\"num\":%d}\r\n\r\n", n);
     if (tcp_send_command (&list, cmd, host, port, &status) < 1) {
         fprintf (stderr, "get_list: failed to retrieve list from directory\n");
         return -1;
@@ -246,7 +245,6 @@ int dir_list (struct node_list *prev, char *host, char *port, int n)
 
     free (list);
     return 0;
-#undef LIST_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
@@ -254,10 +252,9 @@ int dir_list (struct node_list *prev, char *host, char *port, int n)
 //-----------------------------------------------------------------------------
 int dir_connect (char *host, char *host_port, char *listen_port)
 {
-#define CONNECT_STRLEN (13 + PORT_STRLEN)
-    char s[CONNECT_STRLEN];
+    char s[32 + PORT_STRLEN];
     size_t len;
-    len = snprintf (s, CONNECT_STRLEN, "CONNECT %s\r\n\r\n", listen_port);
+    len = sprintf (s, "{\"method\":\"connect\",\"port\":%s}\r\n\r\n",
+            listen_port);
     return udp_send_command (s, len, host, host_port);
-#undef CONNECT_STRLEN
 }

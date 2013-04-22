@@ -38,8 +38,6 @@
 #include "router.h"
 #include "msgcache.h"
 
-#define JSMN_NTOK 256
-
 #define MAX_HOPS 4
 
 #ifdef LISP_OUTPUT
@@ -239,22 +237,6 @@ static void process_discover (struct msg_info *mi, jsmntok_t *tok, int ntok)
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "L %s\n" ANSI_RESET, mi->paddr);
 #endif
-}
-
-/*-----------------------------------------------------------------------------
- * Parses a message into jsmn tokens */
-//-----------------------------------------------------------------------------
-static int parse_message (const char *msg, jsmntok_t *tok, size_t *ntok)
-{
-    int rc;
-    jsmn_parser p;
-
-    jsmn_init (&p);
-    rc = jsmn_parse (&p, msg, tok, *ntok);
-    if (rc != JSMN_SUCCESS || tok[0].type != JSMN_OBJECT)
-        return -1;
-    *ntok =  p.toknext;
-    return jsmn_get_value (msg, tok, "method");
 }
 
 /*-----------------------------------------------------------------------------

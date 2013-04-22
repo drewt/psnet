@@ -39,8 +39,13 @@
 #define PORT_MAX 65535
 #define PORT_STRLEN 5
 
+#define JSMN_NTOK 256
+
 #define MSG_MAX 512
 
+typedef struct jsmntok jsmntok_t;
+
+int parse_message (const char *msg, jsmntok_t *tok, size_t *ntok);
 #ifdef DAEMON
 void daemonize (void);
 #endif

@@ -34,7 +34,7 @@ typedef enum {
  * @param		start	start position in JSON data string
  * @param		end		end position in JSON data string
  */
-typedef struct {
+typedef struct jsmntok {
 	jsmntype_t type;
 	int start;
 	int end;

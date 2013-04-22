@@ -36,8 +36,4 @@ void free_response (struct response_node *node);
 void send_error (int sock, int no, const char *str);
 void send_ok (int sock);
 
-static inline int cmd_equal (const char *str, const char *cmd, size_t len) {
-    return !strncmp (str, cmd, len) && str[len] == '\0';
-}
-
 #endif
