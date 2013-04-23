@@ -168,14 +168,13 @@ static void process_connect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 //-----------------------------------------------------------------------------
 static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    int hops, hop_port, id, port;
+    int hops, id;
     char *msg = mi->msg;
     char *msgid;
-    char *s, *d;
     char v;
 
-    if (jsmn_get_values (msg, tok, "hops", &hops, "hop-port", &hop_port,
-            "id", &id, (void*) NULL) == -1)
+    if (jsmn_get_values (msg, tok, "hops", &hops, "id", &id, (void*) NULL)
+            == -1)
         return;
 
     v = msg[tok[hops].start];
@@ -183,23 +182,11 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
         return; // hop limit reached
     msg[tok[hops].start]++;
 
-    port = atoi (msg + tok[hop_port].start);
-    if (port < PORT_MIN || port > PORT_MAX)
-        return;
-
     msgid = jsmn_tokdup (msg, &tok[id]);
     if (cache_msg (msgid)) {
         free (msgid);
         return;
     }
-
-    set_in_port ((struct sockaddr*) &mi->addr, htons ((in_port_t) port));
-
-    // set hop-port to our listen port
-    // XXX: hop-port should be a string of length PORT_STRLEN so there is space
-    for (d = msg + tok[hop_port].start, s = settings.listen_port;
-            *s != '\0'; *d++ = *s++);
-    while (*d != '"') *d++ = ' ';
 
     flood_message (mi);
 

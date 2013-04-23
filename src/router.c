@@ -104,7 +104,7 @@ void flood_message (struct msg_info *mi)
 
     // send message to routers
     for (it = routers.next; it; it = it->next) {
-        if (sockaddr_equals ((struct sockaddr*)it, (struct sockaddr*)&mi->addr))
+        if (ip_addr_equals ((struct sockaddr*)it, (struct sockaddr*)&mi->addr))
             continue;
         udp_send_msg (mi->msg, mi->len, (struct sockaddr*) &it->addr);
     }

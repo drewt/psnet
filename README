@@ -18,7 +18,6 @@ The basic structure of a broadcast message is:
 {
     "method":"broadcast",
     "hops":0,
-    "hop-port":"     ",   [<-- NOTE: this is mandatory!]
     "data":[anything]
 }
 
@@ -29,11 +28,6 @@ directory to specify the service which is being requested.
 penetration is desired).  It is used by the routers to prevent messages from
 floating around the network indefinitely.  Note that routers currently check
 only the first digit of this number.  This may change in the future.
-
-"hop-port" absolutely must be a string containing 5 spaces.  This is so that
-routers can overwrite this field without using extra memory to copy the message
-or otherwise doing anything fancy.  The field itself if used by routers to
-prevent short forwarding cycles.
 
 "data" is not strictly necessary, but presumably you want to actually send a
 message and not just metadata, in which case it would be a good idea to put the

@@ -65,6 +65,7 @@ extern int max_threads;
 extern int num_threads;
 extern pthread_mutex_t num_threads_lock;
 
+/* returns the IP address in a sockaddr_in or sockaddr_in6 structure */
 static inline void *get_in_addr (const struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET)
@@ -72,6 +73,7 @@ static inline void *get_in_addr (const struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
+/* returns the port number in a sockaddr_in or sockaddr_in6 structure */
 static inline in_port_t get_in_port (const struct sockaddr *sa)
 {
     if (sa->sa_family == AF_INET)
@@ -79,6 +81,7 @@ static inline in_port_t get_in_port (const struct sockaddr *sa)
     return ((struct sockaddr_in6*)sa)->sin6_port;
 }
 
+/* sets the port number of a sockaddr_in or sockaddr_in6 structure */
 static inline void set_in_port (struct sockaddr *sa, in_port_t val)
 {
     if (sa->sa_family == AF_INET)
@@ -87,6 +90,7 @@ static inline void set_in_port (struct sockaddr *sa, in_port_t val)
         ((struct sockaddr_in6*)sa)->sin6_port = val;
 }
 
+/* compares the IP addresses and port numbers of two sockaddr_in structures */
 static inline int sin_equals (const struct sockaddr_in *a,
         const struct sockaddr_in *b)
 {
@@ -94,6 +98,7 @@ static inline int sin_equals (const struct sockaddr_in *a,
         a->sin_port == b->sin_port;
 }
 
+/* compares the IP addresses and port numbers of two sockaddr_in6 structures */
 static inline int sin6_equals (const struct sockaddr_in6 *a,
         const struct sockaddr_in6 *b)
 {
@@ -101,6 +106,7 @@ static inline int sin6_equals (const struct sockaddr_in6 *a,
         a->sin6_port == b->sin6_port;
 }
 
+/* compares the IP addresses and port numbers of two sockaddr structures */
 static inline int sockaddr_equals (const struct sockaddr *a,
         const struct sockaddr *b)
 {
@@ -111,6 +117,21 @@ static inline int sockaddr_equals (const struct sockaddr *a,
     else if (a->sa_family == AF_INET6)
         return sin6_equals ((struct sockaddr_in6*)a, (struct sockaddr_in6*)b);
     return 0;
+}
+
+/* compares the IP addresses--but not the ports--of two sockaddr structures */
+static inline int ip_addr_equals (const struct sockaddr *a,
+        const struct sockaddr *b)
+{
+    if (a->sa_family != b->sa_family)
+        return 0;
+    if (a->sa_family == AF_INET) {
+        return ((struct sockaddr_in*)a)->sin_addr.s_addr
+            != ((struct sockaddr_in*)b)->sin_addr.s_addr;
+    } else {
+        return !memcmp (((struct sockaddr_in6*)a)->sin6_addr.s6_addr,
+                ((struct sockaddr_in6*)b)->sin6_addr.s6_addr, 16);
+    }
 }
 
 #endif
