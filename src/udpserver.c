@@ -102,7 +102,7 @@ int udp_server_init (char *port)
     return sockfd;
 }
 
-_Noreturn void udp_server_main (int sock, void *(*cb)(void*))
+_Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*))
 {
     struct msg_info *msg;
     socklen_t sin_size;

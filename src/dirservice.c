@@ -32,6 +32,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <time.h>
+#include <getopt.h>
 
 #include "jsmn.h"
 
@@ -54,9 +55,16 @@ static const char *psdir_strerror[] = {
     [EBADPORT]   = "invalid argument 'port'" // 23
 };
 
-int max_threads;
 int num_threads;
 pthread_mutex_t num_threads_lock;
+
+static struct settings {
+    int max_threads;
+    char *port;
+} settings = {
+    .max_threads = 1000,
+    .port = "6666"
+};
 
 /*-----------------------------------------------------------------------------
  * Process a 'CONNECT [port]' command */
@@ -261,8 +269,58 @@ void *udp_serve (void *data)
 
     pthread_detach (pthread_self ());
 
-    sockfd = udp_server_init (data);
-    udp_server_main (sockfd, handle_message);
+    sockfd = udp_server_init (((struct settings*)data)->port);
+    udp_server_main (sockfd, ((struct settings*)data)->max_threads,
+            handle_message);
+}
+
+void parse_opts (int argc, char *argv[], struct settings *dst)
+{
+    int c;
+    char *endptr;
+
+    for(;;) {
+        static struct option long_options[] = {
+            { "max-threads", required_argument, 0, 't' },
+            { "listen-port", required_argument, 0, 'l' },
+            { 0, 0, 0, 0 }
+        };
+
+        int options_index = 0;
+
+        c = getopt_long (argc, argv, "t:l:", long_options, &options_index);
+
+        if (c == -1)
+            break;
+
+        switch (c) {
+        case 't':
+            endptr = NULL;
+            dst->max_threads = (int) strtol (optarg, &endptr, 10);
+            if (dst->max_threads < 1 || (endptr && *endptr != '\0')) {
+                puts ("error: --threads argument must be a positive integer");
+                usage ();
+            }
+            break;
+
+        case 'l':
+            endptr = NULL;
+            dst->port = optarg;
+            if (strtol (optarg, &endptr, 10) < 1
+                    || (endptr && *endptr != '\0')) {
+                puts ("error: --listen-port argument "
+                        "must be a positive integer");
+                usage ();
+            }
+            break;
+
+        case '?':
+            break;
+
+        default:
+            usage ();
+        }
+    }
 }
 
 /*-----------------------------------------------------------------------------
@@ -270,25 +328,10 @@ void *udp_serve (void *data)
 //-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
-    char *endptr;
     int sockfd;
     pthread_t tid;
 
-    if (argc != 3)
-        usage ();
-
-    endptr = NULL;
-    max_threads = (int) strtol (argv[1], &endptr, 10);
-    if (max_threads < 1 || (endptr && *endptr != '\0')) {
-        puts ("error: 'nclients' must be an integer greater than 0");
-        usage ();
-    }
-
-    endptr = NULL;
-    if (strtol (argv[2], &endptr, 10) < 1 || (endptr && *endptr != '\0')) {
-        puts ("error: 'port' must be an integer greater than 0");
-        usage ();
-    }
+    parse_opts (argc, argv, &settings);
 
 #ifdef DAEMON
     daemonize ();
@@ -299,9 +342,9 @@ int main (int argc, char *argv[])
 
     clients_init ();
 
-    if (pthread_create (&tid, NULL, udp_serve, argv[2]))
+    if (pthread_create (&tid, NULL, udp_serve, &settings))
         perror ("pthread_create");
 
-    sockfd = tcp_server_init (argv[2]);
-    tcp_server_main (sockfd, handle_connection);
+    sockfd = tcp_server_init (settings.port);
+    tcp_server_main (sockfd, settings.max_threads, handle_connection);
 }

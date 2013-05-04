@@ -61,7 +61,6 @@ struct msg_info {
 #endif
 };
 
-extern int max_threads;
 extern int num_threads;
 extern pthread_mutex_t num_threads_lock;
 

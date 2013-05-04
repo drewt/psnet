@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <getopt.h>
 
 #define JSMN_STRICT
 #include "jsmn.h"
@@ -48,11 +49,13 @@
 #define HDR_OK_STRLEN (29 + 5)
 #endif
 
-static struct {
+static struct settings {
+    int max_threads;
     char *dir_addr;
     char *dir_port;
     char *listen_port;
 } settings = {
+    .max_threads = 1000,
     .dir_addr = "psnet.no-ip.biz",
     .dir_port = "6666",
     .listen_port = "5555",
@@ -67,7 +70,6 @@ static const char *psnode_strerror[] = {
     [EBADNUM]    = "invalid argument 'num'"
 };
 
-int max_threads = 1000;
 int num_threads;
 pthread_mutex_t num_threads_lock;
 
@@ -323,8 +325,9 @@ static void *udp_serve (void *data)
 
     pthread_detach (pthread_self ());
 
-    sockfd = udp_server_init (data);
-    udp_server_main (sockfd, handle_message);
+    sockfd = udp_server_init (((struct settings*)data)->listen_port);
+    udp_server_main (sockfd, ((struct settings*)data)->max_threads,
+            handle_message);
 }
 
 /*-----------------------------------------------------------------------------
@@ -337,11 +340,11 @@ static int ini_handler (void *user, const char *section, const char *name,
         settings.dir_addr = strdup (value);
     } else if (!strcmp (name, "dir_port")) {
         settings.dir_port = strdup (value);
-    } else if (!strcmp (name, "udp_port")) {
+    } else if (!strcmp (name, "listen_port")) {
         settings.listen_port = strdup (value);
     } else if (!strcmp (name, "max_threads")) {
-        if (!(max_threads = atoi (value)))
-            max_threads = 1000000;
+        if (!(settings.max_threads = atoi (value)))
+            settings.max_threads = 1000;
     }
     return 1;
 }
@@ -368,36 +371,82 @@ static int read_rc (void)
     return -1;
 }
 
+void parse_opts (int argc, char *argv[], struct settings *dst)
+{
+    int c;
+    char *endptr;
+
+    for(;;) {
+        static struct option long_options[] = {
+            { "max-threads",       required_argument, 0, 't' },
+            { "listen-port",       required_argument, 0, 'l' },
+            { "directory-address", required_argument, 0, 'a' },
+            { "directory-port",    required_argument, 0, 'p' },
+            { 0, 0, 0, 0 }
+        };
+
+        int options_index = 0;
+
+        c = getopt_long (argc, argv, "t:l:a:p:", long_options, &options_index);
+
+        if (c == -1)
+            break;
+
+        switch (c) {
+        case 't':
+            endptr = NULL;
+            dst->max_threads = (int) strtol (optarg, &endptr, 10);
+            if (dst->max_threads < 1 || (endptr && *endptr != '\0')) {
+                puts ("error: --threads argument must be a positive integer");
+                usage ();
+            }
+            break;
+
+        case 'l':
+            endptr = NULL;
+            dst->listen_port = optarg;
+            if (strtol (optarg, &endptr, 10) < 1
+                    || (endptr && *endptr != '\0')) {
+                puts ("error: --listen-port argument "
+                        "must be a positive integer");
+                usage ();
+            }
+            break;
+
+        case 'a':
+            dst->dir_addr = optarg; // XXX no validity check
+            break;
+
+        case 'p':
+            endptr = NULL;
+            dst->dir_port = optarg;
+            if (strtol (optarg, &endptr, 10) < 1
+                    || (endptr && *endptr != '\0')) {
+                puts ("error: --directory-port argument "
+                        "must be a positive integer");
+                usage ();
+            }
+            break;
+
+        case '?':
+            break;
+
+        default:
+            usage ();
+        }
+    }
+}
+
 /*-----------------------------------------------------------------------------
  * Main... */
 //-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
     int sockfd;
-    long lport;
     pthread_t tid;
 
-    if (argc > 2)
-        usage ();
-
-    // validate port number, if given on the command line
-    if (argc == 2) {
-        lport = strtol (argv[1], NULL, 10);
-        if (lport < PORT_MIN || lport > PORT_MAX) {
-            fprintf (stderr, "error: invalid port\n");
-            usage ();
-        }
-        settings.listen_port= argv[1];
-    }
-
-    if (read_rc () == -1)
-        fprintf (stderr, "error: failed to read psnoderc\n"
-                         "using defaults:\n"
-                         "\tDirectory address: %s\n"
-                         "\tDirectory port:    %s\n"
-                         "\tListen port:       %s\n",
-                         settings.dir_addr, settings.dir_port,
-                         settings.listen_port);
+    read_rc ();
+    parse_opts (argc, argv, &settings);
 
 #ifdef DAEMON
     daemonize ();
@@ -410,9 +459,9 @@ int main (int argc, char *argv[])
     msg_cache_init ();
     router_init (settings.dir_addr, settings.dir_port, settings.listen_port);
 
-    if (pthread_create (&tid, NULL, udp_serve, settings.listen_port))
+    if (pthread_create (&tid, NULL, udp_serve, &settings))
         perror ("pthread_create");
 
     sockfd = tcp_server_init (settings.listen_port);
-    tcp_server_main (sockfd, handle_connection);
+    tcp_server_main (sockfd, settings.max_threads, handle_connection);
 }

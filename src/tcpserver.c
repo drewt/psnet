@@ -104,7 +104,7 @@ int tcp_server_init (char *port)
 /*-----------------------------------------------------------------------------
  * The server's main accept() loop */
 //-----------------------------------------------------------------------------
-_Noreturn void tcp_server_main (int sock, void*(*cb)(void*))
+_Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*))
 {
     socklen_t sin_size;
     struct msg_info *targ;
