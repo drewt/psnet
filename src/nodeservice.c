@@ -343,23 +343,23 @@ static int ini_handler (void *user, const char *section, const char *name,
     if (strcmp (section, "Router"))
         return 1;
 
-    if (!strcmp (name, "dir_addr")) {
+    if (!strcmp (name, "directory-address")) {
         settings.dir_addr = strdup (value);
-    } else if (!strcmp (name, "dir_port")) {
+    } else if (!strcmp (name, "directory-port")) {
         if (!(val = atoi (value)))
-            printf ("%s: error: dir_port must be a positive integer\n",
+            printf ("%s: error: directory-port must be a positive integer\n",
                     (char*) user);
         else
             settings.dir_port = strdup (value);
-    } else if (!strcmp (name, "listen_port")) {
+    } else if (!strcmp (name, "listen-port")) {
         if (!(val = atoi (value)))
-            printf ("%s: error: listen_port must be a positive integer\n",
+            printf ("%s: error: listen-port must be a positive integer\n",
                     (char*) user);
         else
             settings.listen_port = strdup (value);
-    } else if (!strcmp (name, "max_threads")) {
+    } else if (!strcmp (name, "max-threads")) {
         if (!(val = atoi (value)))
-            printf ("%s: error: max_threads must be a positive integer\n",
+            printf ("%s: error: max-threads must be a positive integer\n",
                     (char*) user);
         else
             settings.max_threads = val;

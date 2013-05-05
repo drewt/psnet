@@ -285,15 +285,15 @@ static int ini_handler (void *user, const char *section, const char *name,
     if (strcmp (section, "Directory"))
         return 1;
 
-    if (!strcmp (name, "listen_port")) {
+    if (!strcmp (name, "listen-port")) {
         if (!(val = atoi (value)))
-            printf ("%s: error: listen_port must be a positive integer\n",
+            printf ("%s: error: listen-port must be a positive integer\n",
                     (char*) user);
         else
             settings.port = strdup (value);
-    } else if (!strcmp (name, "max_threads")) {
+    } else if (!strcmp (name, "max-threads")) {
         if (!(val = atoi (value)))
-            printf ("%s: error: max_threads must be a positive integer\n",
+            printf ("%s: error: max-threads must be a positive integer\n",
                     (char*) user);
         else
             settings.max_threads = val;
