@@ -39,6 +39,8 @@
 #include "router.h"
 #include "msgcache.h"
 
+#define RC_FILE "/etc/psnetrc"
+
 #define MAX_HOPS 4
 
 #ifdef LISP_OUTPUT
@@ -336,39 +338,33 @@ static void *udp_serve (void *data)
 static int ini_handler (void *user, const char *section, const char *name,
         const char *value)
 {
+    int val;
+
+    if (strcmp (section, "Router"))
+        return 1;
+
     if (!strcmp (name, "dir_addr")) {
         settings.dir_addr = strdup (value);
     } else if (!strcmp (name, "dir_port")) {
-        settings.dir_port = strdup (value);
+        if (!(val = atoi (value)))
+            printf ("%s: error: dir_port must be a positive integer\n",
+                    (char*) user);
+        else
+            settings.dir_port = strdup (value);
     } else if (!strcmp (name, "listen_port")) {
-        settings.listen_port = strdup (value);
+        if (!(val = atoi (value)))
+            printf ("%s: error: listen_port must be a positive integer\n",
+                    (char*) user);
+        else
+            settings.listen_port = strdup (value);
     } else if (!strcmp (name, "max_threads")) {
-        if (!(settings.max_threads = atoi (value)))
-            settings.max_threads = 1000;
+        if (!(val = atoi (value)))
+            printf ("%s: error: max_threads must be a positive integer\n",
+                    (char*) user);
+        else
+            settings.max_threads = val;
     }
     return 1;
-}
-
-/*-----------------------------------------------------------------------------
- * Attempts to read settings from an rc file at various locations */
-//-----------------------------------------------------------------------------
-static int read_rc (void)
-{
-    char *home, *path;
-
-    if (!ini_parse ("psnoderc", ini_handler, NULL))
-        return 0;
-
-    home = getenv ("HOME");
-    path = malloc (strlen (home) + 10);
-    sprintf (path, "%s%s", home, ".psnoderc");
-    if (!ini_parse (path, ini_handler, NULL))
-        return 0;
-
-    if (!ini_parse ("/etc/psnoderc", ini_handler, NULL))
-        return 0;
-
-    return -1;
 }
 
 void parse_opts (int argc, char *argv[], struct settings *dst)
@@ -445,7 +441,8 @@ int main (int argc, char *argv[])
     int sockfd;
     pthread_t tid;
 
-    read_rc ();
+    if (ini_parse (RC_FILE, ini_handler, RC_FILE))
+        printf ("Warning: failed to parse %s\n", RC_FILE);
     parse_opts (argc, argv, &settings);
 
 #ifdef DAEMON
