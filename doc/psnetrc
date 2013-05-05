@@ -1,0 +1,54 @@
+.\" Process this file with
+.\" groff -man -Tascii psdird.1
+.\"
+.TH PSNETRC 5 "MAY 2013" Linux "psnet Manual"
+.SH NAME
+psnetrc \- psnet configuration file
+.SH SYNOPSIS
+/etc/psnetrc
+.SH DESCRIPTION
+.B psdird
+and
+.B psnoded
+will attempt to read
+.I psnetrc
+when they are started.  The configuration file is divided into two sections,
+"Directory" and "Router", for
+.B psdird
+and
+.B psnoded
+respectively.  Any option which can be specified on the command line may be
+given in this file.  Option names in
+.I psnetrc
+are identical to the long-version names of command line options.
+.SH EXAMPLE
+#
+.sp 0
+# psnetrc - router connecting to local directory
+.sp 0
+#
+.sp 0
+[Directory]
+.sp 0
+listen-port=6666
+
+[Router]
+.sp 0
+directory-address=127.0.0.1
+.sp 0
+directory-port=6666
+.sp 0
+listen-port=5555
+.SH AUTHOR
+Drew Thoreson <drew.thoreson@alumni.ubc.ca>
+.SH COPYRIGHT
+Copyright (c) 2013 Drew Thoreson.  License GPLv3+: GNU GPL version 3 or later
+<http://gnu.org/licenses/gpl.html>.
+.sp 0
+This is free software: you are free to change and redistribute it. There is NO
+WARRANTY, to the extent permitted by law.
+.SH WWW
+http://github.com/drewt/psnet
+.SH "SEE ALSO"
+.BR psnoded (1)
+.BR psdird (1)

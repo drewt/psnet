@@ -1,0 +1,38 @@
+.\" Process this file with
+.\" groff -man -Tascii psdird.1
+.\"
+.TH PSDIRD 1 "MAY 2013" Linux "psnet Manual"
+.SH NAME
+psdird \- psnet directory daemon
+.SH SYNOPSIS
+.B psdird [options]
+.SH DESCRIPTION
+The psnet directory daemon maintains a list of psnet routers and serves it to
+clients (including psnet routers) on demand.  Each psnet router theoretically
+corresponds to a single, disjoint network, though in practice topologies may be
+more complicated (for example, if some routers connect to multiple
+directories).
+.SH OPTIONS
+.IP "-l, --listen-port <port>"
+The port to listen on for client requests.
+.IP "-t, --max-threads <threads>"
+The maximum number of clients to service concurrently.
+.SH FILES
+.I /etc/psnetrc
+.RS
+Config file.  Any option that can be given on the command line can be given in
+this file instead.  Option names are the same as the long version of the
+corresponding command line option (e.g. "max-threads=1000").  Settings for
+the directory should be under the "Directory" section in this file.
+.SH AUTHOR
+Drew Thoreson <drew.thoreson@alumni.ubc.ca>
+.SH COPYRIGHT
+Copyright (c) 2013 Drew Thoreson.  License GPLv3+: GNU GPL version 3 or later
+<http://gnu.org/licenses/gpl.html>.
+.sp 0
+This is free software: you are free to change and redistribute it. There is NO
+WARRANTY, to the extent permitted by law.
+.SH WWW
+http://github.com/drewt/psnet
+.SH "SEE ALSO"
+.BR psnoded (1)
