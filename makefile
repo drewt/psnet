@@ -3,12 +3,25 @@ SHELL = /bin/sh
 .SUFFIXES:
 .PHONY: clean depclean dirclean nodeclean dirmem nodemem
 
+# project directories
 SRC = src
 BIN = bin
 INC = include
 DEP = dep
 DOC = doc
 
+# install directories
+prefix = /usr/local
+bindir = $(prefix)/bin
+man1dir = $(prefix)/share/man/man1
+man5dir = $(prefix)/share/man/man5
+
+man1ext = .1
+man5ext = .5
+
+INSTALL = install -o 0 -g 0 -D
+
+# build programs
 CC      = gcc
 CFLAGS  = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g
 ALLCFLAGS = -I $(INC) $(CFLAGS)
@@ -44,6 +57,13 @@ $(BIN)/%.o: $(SRC)/%.c
 $(DEP)/%.d: $(SRC)/%.c
 	@echo "Generating dependencies for $<"
 	@echo "$@ $(BIN)/`$(CC) -MM -I $(INC) $(CPPFLAGS) $<`" > $@
+
+install: all
+	$(INSTALL) $(BIN)/psdird $(bindir)/psdird
+	$(INSTALL) $(BIN)/psnoded $(bindir)/psnoded
+	$(INSTALL) -m 0644 $(DOC)/psnetrc $(man5dir)/psnetrc$(man5ext)
+	$(INSTALL) -m 0644 $(DOC)/psdird $(man1dir)/psdird$(man1ext)
+	$(INSTALL) -m 0644 $(DOC)/psnoded $(man1dir)/psnoded$(man1ext)
 
 clean:
 	rm -f $(BIN)/*
