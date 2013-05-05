@@ -35,12 +35,15 @@
 #include <getopt.h>
 
 #include "jsmn.h"
+#include "ini.h"
 
 #include "common.h"
 #include "tcp.h"
 #include "udp.h"
 #include "response.h"
 #include "client.h"
+
+#define RC_FILE "/etc/psnetrc"
 
 #define REQ_DELIM " \t\r\n"
 
@@ -274,6 +277,30 @@ void *udp_serve (void *data)
             handle_message);
 }
 
+static int ini_handler (void *user, const char *section, const char *name,
+        const char *value)
+{
+    int val;
+
+    if (strcmp (section, "Directory"))
+        return 1;
+
+    if (!strcmp (name, "listen_port")) {
+        if (!(val = atoi (value)))
+            printf ("%s: error: listen_port must be a positive integer\n",
+                    (char*) user);
+        else
+            settings.port = strdup (value);
+    } else if (!strcmp (name, "max_threads")) {
+        if (!(val = atoi (value)))
+            printf ("%s: error: max_threads must be a positive integer\n",
+                    (char*) user);
+        else
+            settings.max_threads = val;
+    }
+    return 1;
+}
+
 void parse_opts (int argc, char *argv[], struct settings *dst)
 {
     int c;
@@ -331,6 +358,8 @@ int main (int argc, char *argv[])
     int sockfd;
     pthread_t tid;
 
+    if (ini_parse (RC_FILE, ini_handler, RC_FILE))
+        printf ("Warning: failed to parse %s\n", RC_FILE);
     parse_opts (argc, argv, &settings);
 
 #ifdef DAEMON
