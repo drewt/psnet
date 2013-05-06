@@ -1,0 +1,228 @@
+.\" Process this file with
+.\" groff -man -Tascii psnet_protocol
+.\"
+.TH PSNET_PROTOCOL 7 "MAY 2013" Linux "psnet Manual"
+.SH NAME
+psnet protocol \- protocol of the psnet overlay network
+.SH DESCRIPTION
+.B psnet
+is an overlay network that serves as middleware for unreliable broadcast
+messaging.
+.SH PROCESSES
+.B psdird
+.RS
+The "directory" server.  This process is responsible for maintaining a list of
+routers available on the network.  It should be run at a well-known address so
+that routers and clients know where to find it.
+.RE
+
+.B psnoded
+.RS
+The overlay router, or node.  This process is responsible for maintaining a list
+of connected clients, delivering messages to them, and forwarding messages sent
+by their clients for broadcast.
+.SH CONNECTIONS
+.B psdird
+and
+.B psnoded
+maintain virtual "connections" to their clients over UDP, by means of keep-alive
+messages.  In the case of
+.B psdird
+clients are routers, and the purpose of the connection is to have the directory
+advertise the router's location both to other routers in the network and to
+potential clients.
+.B psnoded
+clients are processes which intend to send or receive broadcast messages.  They
+connect to routers in order to receive broadcast messages from them.
+.SH "JOINING THE NETWORK"
+The psnet directory serves as the entry point into the network, both for routers
+and for their clients.  When a router or client wants to join to the network,
+they request information about some number of routers from the directory (a
+"list request").  A router can then connect to the directory (in order to gain
+clients) and begin forwarding messages to the routers it learned about from the 
+list request.  A client may simply request information about a single router and then connect to it.
+
+In case the directory is unavailable, but the address of a router is known,
+clients may send list requests to routers.  They may also send a "directory
+request" to discover the location of a directory, if one is available (XXX: not
+implemented!).
+.SH MESSAGES
+The psnet protocol uses JSON for messages.  The structure of any psnet message
+is either:
+
+{
+    [key]: [value],
+    ...
+.sp 0
+}
+
+where keys are strings and values are (potentially) any valid JSON value, or:
+
+[{"ip":[ip], "port":[port], "ipv":[ip version]}, ...]
+
+in the case of list and discover requests, where [ip] is an IP address, [port]
+is a port number, and [ip version] is either 4 or 6.
+
+Any message of variable length will begin with a header, as follows:
+
+{
+    "status":[status],
+    "size":[size],
+    ...
+.sp 0
+}
+
+where [size] is the length, in bytes, of the message body.  Headers must be
+less than 512 bytes in length, and end in the double CRLF sequence.
+.SH "MESSAGE TYPES"
+.I connect
+.RS
+The purpose of a
+.I connect
+message is to maintain a connection with either a psnet directory or router.
+Note that there is no distinction between establishing and maintaining a
+connection in psnet.  The message structure is:
+
+{
+    "method":"connect",
+    "port":[port]
+.sp 0
+}
+
+where [port] is the port the client is listening on for psnet messages.  This
+message should be sent over UDP.
+.RE
+
+.I disconnect
+.RS
+The purpose of a
+.I disconnect
+message is to promptly terminate a connection with either a psnet directory or
+router.  Depending on the configuration of the directory or router, prompt
+termination may be desirable; however, if the server's expiration interval is
+small, it may be better to simply discontinue sending
+.I connect
+messages.  The message structure is:
+
+{
+    "method":"disconnect",
+    "port":[port]
+.sp 0
+}
+
+where [port] is the port the client has previously advertised to the server.
+This message should be sent over UDP.
+.RE
+
+.I list
+.RS
+The purpose of a
+.I list
+message is to request the network addresses of some number of psnet routers,
+from either a directory or a router.
+The message structure is:
+
+{
+    "method":"list",
+    "num":[num]
+.sp 0
+}
+
+where [num] is the (maximum) number of addresses which should be returned.  The
+structure of the response is described in the
+.B MESSAGES
+section.
+.RE
+
+.I discover
+.RS
+Discover messages are much like list messages, except that the address of the
+requesting client will not be included in the response.  The message structure
+is:
+
+{
+    "method":"discover",
+    "num":[num],
+    "port":[port]
+.sp 0
+}
+
+where [num] is the (maximum) number of addresses which should be returned, and
+[port] is the port number the requesting entity has previously advertised to
+the server.  The structure of the response is described in the
+.B MESSAGES
+section.
+.RE
+
+.I info
+.RS
+The purpose of an
+.I info
+message is to request information about the state of a directory or router. The
+message structure is:
+
+{
+    "method":"info"
+.sp 0
+}
+
+A router will respond as follows:
+
+{
+    "name":[name],
+    "clients":[clients],
+    "cache-load":[load]
+.sp 0
+}
+
+where [name] is some string identifying the router, [clients] is the number of
+clients connected to the router, and [load] is the number of messages in the
+router's message cache.  This information may be used to select an underutilized
+router from a list obtained by a
+.I list
+or
+.I discover
+request.
+
+A directory will respond as follows:
+
+{
+    "name":[name]
+.sp 0
+}
+
+where [name] is some string identifying the directory.
+.RE
+
+.I broadcast
+.RS
+A message intended for broadcast to all clients in the network.  The message
+structure is:
+
+{
+    "method":"broadcast",
+    "hops":0,
+    "id":[id],
+    "data":[data]
+.sp 0
+}
+
+where [id] is a string identifying the message, and [data] is any valid JSON
+value.  Clients should take care to choose an ID that is unlikely to be in use
+already, since routers use IDs to filter duplicate messages.  If two IDs match,
+one will be considered a duplicate and it will be discarded.  On the other hand,
+two clients might deliberately send identical messages (with identical IDs) in
+order to increase network penetration or to increase the speed of delivery.
+.SH AUTHOR
+Drew Thoreson <drew.thoreson@alumni.ubc.ca>
+.SH COPYRIGHT
+Copyright (c) 2013 Drew Thoreson.  License GPLv3+: GNU GPL version 3 or later
+<http://gnu.org/licenses/gpl.html>.
+.sp 0
+This is free software: you are free to change and redistribute it. There is NO
+WARRANTY, to the extent permitted by law.
+.SH WWW
+http://github.com/drewt/psnet
+.SH "SEE ALSO"
+.BR psnoded (1)
+.BR psdird (1)

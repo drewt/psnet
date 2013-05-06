@@ -15,9 +15,11 @@ prefix = /usr/local
 bindir = $(prefix)/bin
 man1dir = $(prefix)/share/man/man1
 man5dir = $(prefix)/share/man/man5
+man7dir = $(prefix)/share/man/man7
 
 man1ext = .1
 man5ext = .5
+man7ext = .7
 
 INSTALL = install -o 0 -g 0 -D
 
@@ -53,6 +55,9 @@ $(BIN)/psnoded: $(OFILES) $(NODEOFILES)
 $(BIN)/%.o: $(SRC)/%.c
 	$(CC) -c $(ALLCFLAGS) $(CPPFLAGS) $< -o $@
 
+README: doc/psnet_protocol
+	groff -man -Tascii $< | col -bx > $@
+
 # automatically generate dependencies
 $(DEP)/%.d: $(SRC)/%.c
 	@echo "Generating dependencies for $<"
@@ -61,6 +66,7 @@ $(DEP)/%.d: $(SRC)/%.c
 install: all
 	$(INSTALL) $(BIN)/psdird $(bindir)/psdird
 	$(INSTALL) $(BIN)/psnoded $(bindir)/psnoded
+	$(INSTALL) -m 0644 $(DOC)/psnet_protocol $(man7dir)/psnet_protocol$(man7ext)
 	$(INSTALL) -m 0644 $(DOC)/psnetrc $(man5dir)/psnetrc$(man5ext)
 	$(INSTALL) -m 0644 $(DOC)/psdird $(man1dir)/psdird$(man1ext)
 	$(INSTALL) -m 0644 $(DOC)/psnoded $(man1dir)/psnoded$(man1ext)

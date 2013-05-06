@@ -1,65 +1,206 @@
-psnet - Pretty Simple Network
+PSNET_PROTOCOL(7)                psnet Manual                PSNET_PROTOCOL(7)
 
-psnet is an overlay network which provides unreliable broadcast services to
-clients.  Clients join the network (i.e. become a destination for broadcast
-messages from other clients) by sending keep-alive messages to one or more
-routers in the network.  They may then broadcast their own messages by sending
-them to a router.
 
-Addresses of the routers are made available by the 'directory' server.  This
-can be run at a well-known address for use by clients to bootstrap into the
-network.  Routers also use the directory to find other routers to forward their
-broadcast messages to.
 
---- PROTOCOL ---
+NAME
+       psnet protocol - protocol of the psnet overlay network
 
-The basic structure of a broadcast message is:
+DESCRIPTION
+       psnet  is  an  overlay network that serves as middleware for unreliable
+       broadcast messaging.
 
-{
-    "method":"broadcast",
-    "hops":0,
-    "data":[anything]
-}
+PROCESSES
+       psdird
+              The "directory" server.  This process is responsible  for  main-
+              taining  a  list of routers available on the network.  It should
+              be run at a well-known address so that routers and clients  know
+              where to find it.
 
-The "method" field is used throughout the protocol at both the router and the
-directory to specify the service which is being requested.
+       psnoded
+              The  overlay  router,  or node.  This process is responsible for
+              maintaining a list of connected clients, delivering messages  to
+              them,  and  forwarding messages sent by their clients for broad-
+              cast.
 
-"hops" should be set to 0 at the client (or perhaps higher, if reduced network
-penetration is desired).  It is used by the routers to prevent messages from
-floating around the network indefinitely.  Note that routers currently check
-only the first digit of this number.  This may change in the future.
+CONNECTIONS
+       psdird and psnoded maintain virtual "connections" to their clients over
+       UDP,  by  means  of keep-alive messages.  In the case of psdird clients
+       are routers, and the purpose of the connection is to have the directory
+       advertise  the  router's  location both to other routers in the network
+       and to potential clients.  psnoded clients are processes  which  intend
+       to  send  or  receive  broadcast  messages.  They connect to routers in
+       order to receive broadcast messages from them.
 
-"data" is not strictly necessary, but presumably you want to actually send a
-message and not just metadata, in which case it would be a good idea to put the
-message in this field.  You could also make up your own fields, but this may
-break in future versions of the protocol.
+JOINING THE NETWORK
+       The psnet directory serves as the entry point into  the  network,  both
+       for  routers  and  for their clients.  When a router or client wants to
+       join to the network, they request  information  about  some  number  of
+       routers  from the directory (a "list request").  A router can then con-
+       nect to the directory (in order to gain clients) and  begin  forwarding
+       messages  to  the  routers  it  learned about from the list request.  A
+       client may simply request information about a single  router  and  then
+       connect to it.
 
-Routers accept broadcast messages over both TCP and UDP.  It's probably a good
-idea to send them over TCP to ensure they make it into the network, though
-subsequent hops (between routers and from routers to clients) will use UDP.
+       In  case  the  directory is unavailable, but the address of a router is
+       known, clients may send list requests to routers.  They may also send a
+       "directory  request" to discover the location of a directory, if one is
+       available (XXX: not implemented!).
 
-Keep-alive messages are as follows:
+MESSAGES
+       The psnet protocol uses JSON for messages.  The structure of any  psnet
+       message is either:
 
-{
-    "method":"connect",
-    "port":[port number]
-}
+       {
+           [key]: [value],
+           ...
+       }
 
-"port" should be a valid port number.
+       where  keys  are  strings  and  values are (potentially) any valid JSON
+       value, or:
 
-The interval at which keep-alive messages should be sent is determined by
-compile-time options.  These messages should be sent over UDP.
+       [{"ip":[ip], "port":[port], "ipv":[ip version]}, ...]
 
-Routers also support a "discover" command which can be used to find other
-routers in case the directory is unavailable.  This is of limited use to
-clients, and currently routers do not make use of it amongst themselves (though
-this is likely to change).
+       in the case of list and discover requests, where [ip] is an IP address,
+       [port] is a port number, and [ip version] is either 4 or 6.
 
-{
-    "method":"discover",
-    "num":[number]
-}
+       Any message of variable length will begin with a header, as follows:
 
-"num" specifies the number of routers to be returned.
+       {
+           "status":[status],
+           "size":[size],
+           ...
+       }
 
-The directory supports... TODO
+       where  [size]  is  the  length, in bytes, of the message body.  Headers
+       must be less than 512 bytes in length,  and  end  in  the  double  CRLF
+       sequence.
+
+MESSAGE TYPES
+       connect
+              The  purpose  of  a  connect message is to maintain a connection
+              with either a psnet directory or router.  Note that there is  no
+              distinction between establishing and maintaining a connection in
+              psnet.  The message structure is:
+
+              {
+                  "method":"connect",
+                  "port":[port]
+              }
+
+              where [port] is the port the client is listening  on  for  psnet
+              messages.  This message should be sent over UDP.
+
+       disconnect
+              The  purpose  of a disconnect message is to promptly terminate a
+              connection with either a psnet directory or  router.   Depending
+              on the configuration of the directory or router, prompt termina-
+              tion may be  desirable;  however,  if  the  server's  expiration
+              interval  is small, it may be better to simply discontinue send-
+              ing connect messages.  The message structure is:
+
+              {
+                  "method":"disconnect",
+                  "port":[port]
+              }
+
+              where [port] is the port the client has previously advertised to
+              the server.  This message should be sent over UDP.
+
+       list
+              The  purpose  of  a  list  message  is  to  request  the network
+              addresses of some number of psnet routers, from either a  direc-
+              tory or a router.  The message structure is:
+
+              {
+                  "method":"list",
+                  "num":[num]
+              }
+
+              where [num] is the (maximum) number of addresses which should be
+              returned.  The structure of the response  is  described  in  the
+              MESSAGES section.
+
+       discover
+              Discover  messages  are much like list messages, except that the
+              address of the requesting client will not  be  included  in  the
+              response.  The message structure is:
+
+              {
+                  "method":"discover",
+                  "num":[num],
+                  "port":[port]
+              }
+
+              where [num] is the (maximum) number of addresses which should be
+              returned, and [port] is the port number  the  requesting  entity
+              has  previously  advertised to the server.  The structure of the
+              response is described in the MESSAGES section.
+
+       info
+              The purpose of an info message is to request  information  about
+              the state of a directory or router. The message structure is:
+
+              {
+                  "method":"info"
+              }
+
+              A router will respond as follows:
+
+              {
+                  "name":[name],
+                  "clients":[clients],
+                  "cache-load":[load]
+              }
+
+              where [name] is some string identifying the router, [clients] is
+              the number of clients connected to the router, and [load] is the
+              number of messages in the router's message cache.  This informa-
+              tion may be used to select an underutilized router from  a  list
+              obtained by a list or discover request.
+
+              A directory will respond as follows:
+
+              {
+                  "name":[name]
+              }
+
+              where [name] is some string identifying the directory.
+
+       broadcast
+              A  message intended for broadcast to all clients in the network.
+              The message structure is:
+
+              {
+                  "method":"broadcast",
+                  "hops":0,
+                  "id":[id],
+                  "data":[data]
+              }
+
+              where [id] is a string identifying the message,  and  [data]  is
+              any  valid JSON value.  Clients should take care to choose an ID
+              that is unlikely to be in use already, since routers use IDs  to
+              filter  duplicate  messages.  If two IDs match, one will be con-
+              sidered a duplicate and it will  be  discarded.   On  the  other
+              hand,  two  clients  might  deliberately send identical messages
+              (with identical IDs) in order to increase network penetration or
+              to increase the speed of delivery.
+
+AUTHOR
+       Drew Thoreson <drew.thoreson@alumni.ubc.ca>
+
+COPYRIGHT
+       Copyright (c) 2013 Drew Thoreson.  License GPLv3+: GNU GPL version 3 or
+       later <http://gnu.org/licenses/gpl.html>.
+       This is free software: you are free  to  change  and  redistribute  it.
+       There is NO WARRANTY, to the extent permitted by law.
+
+WWW
+       http://github.com/drewt/psnet
+
+SEE ALSO
+       psnoded(1) psdird(1)
+
+
+
+Linux                              MAY 2013                  PSNET_PROTOCOL(7)
