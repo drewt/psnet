@@ -47,6 +47,9 @@
 
 #define REQ_DELIM " \t\r\n"
 
+#define HDR_OK_FMT "{\"status\":\"okay\",\"size\":%lu}\r\n\r\n"
+#define HDR_OK_STRLEN (29 + 5)
+
 #define dir_error(sock, no) send_error (sock, no, psdir_strerror[no])
 enum input_errors { ENOMETHOD,ENONUM,ENOPORT,EBADMETHOD,EBADNUM,EBADPORT };
 static const char *psdir_strerror[] = {
@@ -68,6 +71,21 @@ static struct settings {
     .max_threads = 1000,
     .port = "6666"
 };
+
+static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
+{
+#define INFO_STR "{\"name\":\"generic psnet directory\"}\r\n\r\n"
+#define INFO_STRLEN (sizeof INFO_STR - 1)
+    char hdr[HDR_OK_STRLEN];
+    int hdr_len;
+
+    hdr_len = sprintf (hdr, HDR_OK_FMT, INFO_STRLEN);
+
+    tcp_send_bytes (mi->sock, hdr, hdr_len);
+    tcp_send_bytes (mi->sock, INFO_STR, INFO_STRLEN);
+#undef INFO_STR
+#undef INFO_STRLEN
+}
 
 /*-----------------------------------------------------------------------------
  * Process a 'CONNECT [port]' command */
@@ -205,6 +223,8 @@ static void *handle_connection (void *data)
             process_list (mi, tok, ntok);
         } else if (cmd_equal ("discover")) {
             process_discover (mi, tok, ntok);
+        } else if (cmd_equal ("info")) {
+            process_info (mi, tok, ntok);
         } else {
             dir_error (mi->sock, EBADMETHOD);
             break;
