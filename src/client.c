@@ -140,13 +140,8 @@ struct make_list_arg {
 //-----------------------------------------------------------------------------
 static int make_list (const void *data, void *arg)
 {
-#ifdef LISP_OUTPUT
-#define ELM_FMT "(:ip \"%s\" :port %d :ipv %d) "
-#define ELM_STRLEN 22 + INET6_ADDRSTRLEN + PORT_STRLEN + 1
-#else
 #define ELM_FMT "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},"
 #define ELM_STRLEN 25 + INET6_ADDRSTRLEN + PORT_STRLEN + 1
-#endif
     const struct sockaddr_storage *client = data;
     struct make_list_arg *ml_arg = arg;
     if (ml_arg->i >= ml_arg->n)
@@ -182,13 +177,6 @@ static int make_list (const void *data, void *arg)
 int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
         const char *n)
 {
-#ifdef LISP_OUTPUT
-#define LIST_OPEN  "("
-#define LIST_CLOSE ")"
-#else
-#define LIST_OPEN  "["
-#define LIST_CLOSE "]"
-#endif
     int num;
     char *endptr;
     struct make_list_arg arg;
@@ -203,7 +191,7 @@ int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
     arg.ignore = ign;
 
     arg.prev = malloc (sizeof (struct response_node));
-    arg.prev->data = strdup (LIST_OPEN);
+    arg.prev->data = strdup ("[");
     arg.prev->size = 1;
     arg.prev->next = NULL;
     head = arg.prev;
@@ -214,14 +202,12 @@ int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
         arg.prev->size--; // ignore trailing separator
 
     arg.prev->next = malloc (sizeof (struct response_node));
-    arg.prev->next->data = strdup (LIST_CLOSE "\r\n\r\n");
+    arg.prev->next->data = strdup ("]\r\n\r\n");
     arg.prev->next->size = 5;
     arg.prev->next->next = NULL;
 
     *dest = head;
     return CL_OK;
-#undef LIST_OPEN
-#undef LIST_CLOSE
 }
 
 static int fwd_to_client (const void *data, void *arg)

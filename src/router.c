@@ -117,23 +117,14 @@ void flood_message (struct msg_info *mi)
 
 void routers_to_json (struct response_node **dst, int n)
 {
-#ifdef LISP_OUTPUT
-#define LIST_OPEN  "("
-#define LIST_CLOSE ")"
-#define ELM_FMT "(:ip \"%s\" :port %d :ipv %d) "
-#define ELM_STRLEN 23 + INET6_ADDRSTRLEN + PORT_STRLEN
-#else
-#define LIST_OPEN  "["
-#define LIST_CLOSE "]"
 #define ELM_FMT "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},"
 #define ELM_STRLEN 26 + INET6_ADDRSTRLEN + PORT_STRLEN
-#endif
     struct response_node *prev, *tmp;
     struct node_list *it;
     char addr[INET6_ADDRSTRLEN];
 
     *dst = malloc (sizeof (struct response_node));
-    (*dst)->data = strdup (LIST_OPEN);
+    (*dst)->data = strdup ("[");
     (*dst)->size = 1;
     (*dst)->next = NULL;
     prev = *dst;
@@ -159,12 +150,10 @@ void routers_to_json (struct response_node **dst, int n)
     if (it != routers.next)
         prev->size--; // ignore trailing separator
     tmp = malloc (sizeof (struct response_node));
-    tmp->data = strdup (LIST_CLOSE "\r\n\r\n");
+    tmp->data = strdup ("]\r\n\r\n");
     tmp->size = 5;
     tmp->next = NULL;
     prev->next = tmp;
-#undef LIST_OPEN
-#undef LIST_CLOSE
 #undef ELM_FMT
 #undef MAX_LEN
 }

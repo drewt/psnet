@@ -44,13 +44,8 @@ int tcp_send_bytes (int sock, char *buf, size_t len)
 
 void send_error (int sock, int no, const char *str)
 {
-#ifdef LISP_OUTPUT
-#define ERR_FMT "(:status \"error\" :code %d :reason \"%s\")\r\n\r\n"
-#define ERR_LEN 39 + 3 + PSNET_ERRSTRLEN
-#else
 #define ERR_FMT "{\"status\":\"error\",\"code\":%d,\"reason\":\"%s\"}\r\n\r\n"
 #define ERR_LEN 42 + 3 + PSNET_ERRSTRLEN
-#endif
     int rv;
     char s[ERR_LEN];
     rv = sprintf (s, ERR_FMT, no, str);
@@ -61,11 +56,7 @@ void send_error (int sock, int no, const char *str)
 
 void send_ok (int sock)
 {
-#ifdef LISP_OUTPUT
-    tcp_send_bytes (sock, "(:status \"okay\")\r\n\r\n", 20);
-#else
     tcp_send_bytes (sock, "{\"status\":\"okay\"}\r\n\r\n", 21);
-#endif
 }
 
 /*-----------------------------------------------------------------------------
@@ -100,13 +91,8 @@ void make_response_with_body (struct response_node *head,
     // fill out header node
     hdr = malloc (sizeof (struct response_node));
     hdr->data = malloc (100);
-#ifdef LISP_OUTPUT
-    hdr->size = snprintf (hdr->data, 100,
-            "(:status \"okay\" :size %lu)\r\n\r\n", rest_len);
-#else
     hdr->size = snprintf (hdr->data, 100,
             "{\"status\":\"okay\",\"size\":%lu}\r\n\r\n", rest_len);
-#endif
     hdr->next = body;
 
     head->next = hdr;

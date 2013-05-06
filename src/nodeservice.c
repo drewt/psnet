@@ -43,13 +43,8 @@
 
 #define MAX_HOPS 4
 
-#ifdef LISP_OUTPUT
-#define HDR_OK_FMT "(:status \"okay\" :size %d)\r\n\r\n"
-#define HDR_OK_STRLEN (27 + 5)
-#else
 #define HDR_OK_FMT "{\"status\":\"okay\",\"size\":%d}\r\n\r\n"
 #define HDR_OK_STRLEN (29 + 5)
-#endif
 
 static struct settings {
     int max_threads;
@@ -80,12 +75,6 @@ pthread_mutex_t num_threads_lock;
 //-----------------------------------------------------------------------------
 static void process_ip (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
-#ifdef LISP_OUTPUT
-#define RSP_FMT "(:ip \"%s\")\r\n\r\n"
-#else
-#define RSP_FMT "{\"ip\":\"%s\"}\r\n\r\n"
-#endif
-
     char addr[INET6_ADDRSTRLEN];
     char hdr[HDR_OK_STRLEN];
     char rsp[13 + INET6_ADDRSTRLEN];
@@ -93,13 +82,11 @@ static void process_ip (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 
     inet_ntop (mi->addr.ss_family, get_in_addr ((struct sockaddr*) &mi->addr),
             addr, sizeof addr);
-    rsp_len = sprintf (rsp, RSP_FMT, addr);
+    rsp_len = sprintf (rsp, "{\"ip\":\"%s\"}\r\n\r\n", addr);
     hdr_len = sprintf (hdr, HDR_OK_FMT, rsp_len);
 
     tcp_send_bytes (mi->sock, hdr, hdr_len);
     tcp_send_bytes (mi->sock, rsp, rsp_len);
-
-#undef RSP_FMT
 }
 
 /*-----------------------------------------------------------------------------
@@ -107,15 +94,9 @@ static void process_ip (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 //-----------------------------------------------------------------------------
 static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
-#ifdef LISP_OUTPUT
-#define INFO_FMT "(:name \"generic psnet router\" "\
-                  ":clients %d :cache-load %d)\r\n\r\n"
-#define INFO_STRLEN (57 + 10 + 10)
-#else
 #define INFO_FMT "{\"name\":\"generic psnet router\","\
                   "\"clients\":%d,\"cache-load\":%d}\r\n\r\n"
 #define INFO_STRLEN (60 + 10 + 10)
-#endif
 
     char hdr[HDR_OK_STRLEN];
     char rsp[INFO_STRLEN];
