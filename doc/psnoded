@@ -1,21 +1,21 @@
 .\" Process this file with
 .\" groff -man -Tascii psdird.1
 .\"
-.TH PSNODED 1 "MAY 2013" Linux "psnet Manual"
+.TH PSNODED 1 "MAY 2013" Linux "PSNet Manual"
 .SH NAME
-psnoded \- psnet router ("node") daemon
+psnoded \- PSNet router ("node") daemon
 .SH SYNOPSIS
 .B psnoded [options]
 .SH DESCRIPTION
-The psnet router daemon maintains a list of connected clients and handles
+The PSNet router daemon maintains a list of connected clients and handles
 forwarding broadcast messages to/from them.
 .SH OPTIONS
 .IP "-a, --directory-address <address>"
-The address (either a domain name or an IP address) of a psnet directory.
+The address (either a domain name or an IP address) of a PSNet directory.
 .IP "-l, --listen-port <port>"
 The port to listen on for client requests.
 .IP "-p, --directory-port <port>"
-The port number that the psnet directory is listening for requests on.
+The port number that the PSNet directory is listening for requests on.
 .IP "-t, --max-threads <threads>"
 The maximum number of clients to service concurrently.
 .SH FILES

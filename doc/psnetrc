@@ -1,9 +1,9 @@
 .\" Process this file with
 .\" groff -man -Tascii psdird.1
 .\"
-.TH PSNETRC 5 "MAY 2013" Linux "psnet Manual"
+.TH PSNETRC 5 "MAY 2013" Linux "PSNet Manual"
 .SH NAME
-psnetrc \- psnet configuration file
+psnetrc \- PSNet configuration file
 .SH SYNOPSIS
 /etc/psnetrc
 .SH DESCRIPTION

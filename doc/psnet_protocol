@@ -1,12 +1,11 @@
 .\" Process this file with
 .\" groff -man -Tascii psnet_protocol
 .\"
-.TH PSNET_PROTOCOL 7 "MAY 2013" Linux "psnet Manual"
+.TH PSNET_PROTOCOL 7 "MAY 2013" Linux "PSNet Manual"
 .SH NAME
-psnet protocol \- protocol of the psnet overlay network
+psnet protocol \- protocol of the PSNet overlay network
 .SH DESCRIPTION
-.B psnet
-is an overlay network that serves as middleware for unreliable broadcast
+PSNet is an overlay network that serves as middleware for unreliable broadcast
 messaging.
 .SH PROCESSES
 .B psdird
@@ -35,7 +34,7 @@ potential clients.
 clients are processes which intend to send or receive broadcast messages.  They
 connect to routers in order to receive broadcast messages from them.
 .SH "JOINING THE NETWORK"
-The psnet directory serves as the entry point into the network, both for routers
+The PSNet directory serves as the entry point into the network, both for routers
 and for their clients.  When a router or client wants to join to the network,
 they request information about some number of routers from the directory (a
 "list request").  A router can then connect to the directory (in order to gain
@@ -47,7 +46,7 @@ clients may send list requests to routers.  They may also send a "directory
 request" to discover the location of a directory, if one is available (XXX: not
 implemented!).
 .SH MESSAGES
-The psnet protocol uses JSON for messages.  The structure of any psnet message
+The PSNet protocol uses JSON for messages.  The structure of any PSNet message
 is either:
 
 {
@@ -79,9 +78,9 @@ less than 512 bytes in length, and end in the double CRLF sequence.
 .RS
 The purpose of a
 .I connect
-message is to maintain a connection with either a psnet directory or router.
+message is to maintain a connection with either a PSNet directory or router.
 Note that there is no distinction between establishing and maintaining a
-connection in psnet.  The message structure is:
+connection in PSNet.  The message structure is:
 
 {
     "method":"connect",
@@ -89,7 +88,7 @@ connection in psnet.  The message structure is:
 .sp 0
 }
 
-where [port] is the port the client is listening on for psnet messages.  This
+where [port] is the port the client is listening on for PSNet messages.  This
 message should be sent over UDP.
 .RE
 
@@ -97,7 +96,7 @@ message should be sent over UDP.
 .RS
 The purpose of a
 .I disconnect
-message is to promptly terminate a connection with either a psnet directory or
+message is to promptly terminate a connection with either a PSNet directory or
 router.  Depending on the configuration of the directory or router, prompt
 termination may be desirable; however, if the server's expiration interval is
 small, it may be better to simply discontinue sending
@@ -118,7 +117,7 @@ This message should be sent over UDP.
 .RS
 The purpose of a
 .I list
-message is to request the network addresses of some number of psnet routers,
+message is to request the network addresses of some number of PSNet routers,
 from either a directory or a router.
 The message structure is:
 
