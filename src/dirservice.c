@@ -47,7 +47,7 @@
 
 #define REQ_DELIM " \t\r\n"
 
-#define HDR_OK_FMT "{\"status\":\"okay\",\"size\":%lu}\r\n\r\n"
+#define HDR_OK_FMT "{\"status\":\"okay\",\"size\":%d}\r\n\r\n"
 #define HDR_OK_STRLEN (29 + 5)
 
 #define dir_error(sock, no) send_error (sock, no, psdir_strerror[no])
@@ -74,16 +74,21 @@ static struct settings {
 
 static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
-#define INFO_STR "{\"name\":\"generic psnet directory\"}\r\n\r\n"
-#define INFO_STRLEN (sizeof INFO_STR - 1)
-    char hdr[HDR_OK_STRLEN];
-    int hdr_len;
+#define INFO_FMT "{\"name\":\"generic psnet directory\","\
+                  "\"routers\":%d}\r\n\r\n"
+#define INFO_STRLEN (49 + 10)
 
-    hdr_len = sprintf (hdr, HDR_OK_FMT, INFO_STRLEN);
+    char hdr[HDR_OK_STRLEN];
+    char rsp[INFO_STRLEN];
+    int hdr_len, rsp_len;
+
+    rsp_len = sprintf (rsp, INFO_FMT, client_list_size());
+    hdr_len = sprintf (hdr, HDR_OK_FMT, rsp_len);
 
     tcp_send_bytes (mi->sock, hdr, hdr_len);
-    tcp_send_bytes (mi->sock, INFO_STR, INFO_STRLEN);
-#undef INFO_STR
+    tcp_send_bytes (mi->sock, rsp, rsp_len);
+
+#undef INFO_FMT
 #undef INFO_STRLEN
 }
 
