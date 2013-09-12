@@ -36,7 +36,7 @@ void udp_send_msg (const char *msg, size_t len, const struct sockaddr *dst)
     socklen_t sin_size;
     int s;
 
-    if ((s = socket (AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+    if ((s = socket (dst->sa_family, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         perror ("socket");
         return;
     }
