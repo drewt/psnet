@@ -140,8 +140,6 @@ struct make_list_arg {
 //-----------------------------------------------------------------------------
 static int make_list (const void *data, void *arg)
 {
-#define ELM_FMT "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},"
-#define ELM_STRLEN 25 + INET6_ADDRSTRLEN + PORT_STRLEN + 1
     const struct sockaddr_storage *client = data;
     struct make_list_arg *ml_arg = arg;
     if (ml_arg->i >= ml_arg->n)
@@ -156,8 +154,10 @@ static int make_list (const void *data, void *arg)
 
     struct response_node *node = malloc (sizeof (struct response_node));
 
-    node->data = malloc (ELM_STRLEN);
-    node->size = sprintf (node->data, ELM_FMT, addr,
+    node->data = malloc (25 + INET6_ADDRSTRLEN + PORT_STRLEN + 1);
+    node->size = sprintf (node->data,
+            "{\"ip\":\"%s\",\"port\":%d,\"ipv\":%d},",
+            addr,
             ntohs (get_in_port ((struct sockaddr*) client)),
             client->ss_family == AF_INET ? 4 : 6);
     node->next = NULL;
@@ -166,13 +166,11 @@ static int make_list (const void *data, void *arg)
     ml_arg->prev = node;
 
     return 0;
-#undef ELM_FMT
-#undef ELM_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
  * Constructs a JSON array from the server's list of clients, excluding the
- * client given by the supplied IP address and port number */
+ * client given by the supplied sockaddr structure */
 //-----------------------------------------------------------------------------
 int clients_to_json (struct response_node **dest, struct sockaddr_storage *ign,
         const char *n)

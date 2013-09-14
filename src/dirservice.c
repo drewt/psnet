@@ -16,11 +16,6 @@
  * psnet.  If not, see <http://www.gnu.org/licenses/>
  */
 
-/* service.c : handles connections from clients
- *
- * Author: Drew Thoreson
- */
-
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -45,8 +40,6 @@
 
 #define RC_FILE "/etc/psnetrc"
 
-#define REQ_DELIM " \t\r\n"
-
 #define HDR_OK_FMT "{\"status\":\"okay\",\"size\":%d}\r\n\r\n"
 #define HDR_OK_STRLEN (29 + 5)
 
@@ -58,7 +51,7 @@ static const char *psdir_strerror[] = {
     [ENOPORT]    = "missing argument 'port'",
     [EBADMETHOD] = "unrecognized method",
     [EBADNUM]    = "invalid argument 'num'",
-    [EBADPORT]   = "invalid argument 'port'" // 23
+    [EBADPORT]   = "invalid argument 'port'"
 };
 
 int num_threads;
@@ -74,22 +67,16 @@ static struct settings {
 
 static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
-#define INFO_FMT "{\"name\":\"generic psnet directory\","\
-                  "\"routers\":%d}\r\n\r\n"
-#define INFO_STRLEN (49 + 10)
-
     char hdr[HDR_OK_STRLEN];
-    char rsp[INFO_STRLEN];
+    char rsp[49 + 10]; /* space for 10-digit router count */
     int hdr_len, rsp_len;
 
-    rsp_len = sprintf (rsp, INFO_FMT, client_list_size());
+    rsp_len = sprintf (rsp, "{\"name\":\"generic psnet directory\","
+            "\"routers\":%d}\r\n\r\n", client_list_size());
     hdr_len = sprintf (hdr, HDR_OK_FMT, rsp_len);
 
     tcp_send_bytes (mi->sock, hdr, hdr_len);
     tcp_send_bytes (mi->sock, rsp, rsp_len);
-
-#undef INFO_FMT
-#undef INFO_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
@@ -280,9 +267,6 @@ cleanup:
     pthread_exit (NULL);
 }
 
-/*-----------------------------------------------------------------------------
- * Usage... */
-//-----------------------------------------------------------------------------
 static _Noreturn void usage (void)
 {
     puts ("usage: infradir [nclients] [port]\n"

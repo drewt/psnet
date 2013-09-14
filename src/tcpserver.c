@@ -16,11 +16,7 @@
  * psnet.  If not, see <http://www.gnu.org/licenses/>
  */
 
-/* mtserver.c : waits for connections and spawns threads to service them
- *
- * Author: Drew Thoreson
- * Based largely on code from beej's guide
- */
+/* Based largely on code from beej's guide */
 
 #include <stdio.h>
 #include <stdlib.h>

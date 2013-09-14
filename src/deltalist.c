@@ -334,6 +334,9 @@ void delta_foreach (struct delta_list *table,
     pthread_mutex_unlock (&table->lock);
 }
 
+/*-----------------------------------------------------------------------------
+ * Returns the size of the given list */
+//-----------------------------------------------------------------------------
 unsigned int delta_size (struct delta_list *table)
 {
     unsigned int rv;

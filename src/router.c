@@ -155,5 +155,5 @@ void routers_to_json (struct response_node **dst, int n)
     tmp->next = NULL;
     prev->next = tmp;
 #undef ELM_FMT
-#undef MAX_LEN
+#undef ELM_STRLEN
 }

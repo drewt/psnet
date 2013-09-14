@@ -94,22 +94,17 @@ static void process_ip (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 //-----------------------------------------------------------------------------
 static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
-#define INFO_FMT "{\"name\":\"generic psnet router\","\
-                  "\"clients\":%d,\"cache-load\":%d}\r\n\r\n"
-#define INFO_STRLEN (60 + 10 + 10)
-
     char hdr[HDR_OK_STRLEN];
-    char rsp[INFO_STRLEN];
+    char rsp[60 + 10 + 10]; /* 20 digits for clients and cache-load */
     int hdr_len, rsp_len;
 
-    rsp_len = sprintf (rsp, INFO_FMT, client_list_size (), msg_cache_size ());
+    rsp_len = sprintf (rsp, "{\"name\":\"generic psnet router\","
+            "\"clients\":%d,\"cache-load\":%d}\r\n\r\n",
+            client_list_size (), msg_cache_size ());
     hdr_len = sprintf (hdr, HDR_OK_FMT, rsp_len);
 
     tcp_send_bytes (mi->sock, hdr, hdr_len);
     tcp_send_bytes (mi->sock, rsp, rsp_len);
-
-#undef INFO_FMT
-#undef INFO_STRLEN
 }
 
 /*-----------------------------------------------------------------------------
@@ -289,9 +284,6 @@ cleanup:
     pthread_exit (NULL);
 }
 
-/*-----------------------------------------------------------------------------
- * Usage... */
-//-----------------------------------------------------------------------------
 static _Noreturn void usage (void)
 {
     puts ("usage: infranode [port]\n"
@@ -299,9 +291,6 @@ static _Noreturn void usage (void)
     exit (EXIT_FAILURE);
 }
 
-/*-----------------------------------------------------------------------------
- * UDP server thread */
-//-----------------------------------------------------------------------------
 static void *udp_serve (void *data)
 {
     int sockfd;
@@ -313,9 +302,6 @@ static void *udp_serve (void *data)
             handle_message);
 }
 
-/*-----------------------------------------------------------------------------
- * Callback for ini parser */
-//-----------------------------------------------------------------------------
 static int ini_handler (void *user, const char *section, const char *name,
         const char *value)
 {
@@ -414,9 +400,6 @@ void parse_opts (int argc, char *argv[], struct settings *dst)
     }
 }
 
-/*-----------------------------------------------------------------------------
- * Main... */
-//-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
     int sockfd;

@@ -72,7 +72,7 @@ install: all
 	$(INSTALL) -m 0644 $(DOC)/psnoded $(man1dir)/psnoded$(man1ext)
 
 clean:
-	rm -f $(BIN)/*
+	rm -f $(DIROFILES) $(NODEOFILES) $(OFILES) $(XFILES)
 
 depclean:
 	rm -f $(DEP)/*
