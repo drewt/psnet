@@ -18,9 +18,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
-#include "common.h"
 #include "deltalist.h"
+#include "misc.h"
 
 #define ID_STRLEN 5
 

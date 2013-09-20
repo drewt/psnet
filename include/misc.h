@@ -16,16 +16,21 @@
  * psnet.  If not, see <http://www.gnu.org/licenses/>
  */
 
-#ifndef _PSNET_DIRCLIENT_H_
-#define _PSNET_DIRCLIENT_H_
+#ifndef _MISC_H
+#define _MISC_H
 
-struct node_list;
+#ifdef DAEMON
+#define ANSI_YELLOW ""
+#define ANSI_GREEN  ""
+#define ANSI_RED    ""
+#define ANSI_RESET  ""
+#else
+#define ANSI_YELLOW "\x1b[33m"
+#define ANSI_GREEN  "\x1b[32m"
+#define ANSI_RED    "\x1b[31m"
+#define ANSI_RESET  "\x1b[0m"
+#endif
 
-enum dir_status { STATUS_OKAY = 0, STATUS_ERROR = -1 };
-
-int dir_discover (struct node_list *prev, char *host, char *host_port,
-        char *listen_port, int n);
-int dir_list (struct node_list *prev, char *host, char *port, int n);
-int dir_connect (char *host, char *host_port, char *listen_port);
+void daemonize (const char *log_file);
 
 #endif

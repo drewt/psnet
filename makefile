@@ -1,18 +1,12 @@
-SHELL = /bin/sh
+# Don't use make's built-in rules or variables, and don't print directory info
+MAKEFLAGS += -rR --no-print-directory
 
-.SUFFIXES:
-.PHONY: clean depclean dirclean nodeclean dirmem nodemem
-
-# project directories
-SRC = src
-BIN = bin
-INC = include
-DEP = dep
-DOC = doc
+topdir = $(CURDIR)
+export topdir
 
 # install directories
-prefix = /usr/local
-bindir = $(prefix)/bin
+prefix  = /usr/local
+bindir  = $(prefix)/bin
 man1dir = $(prefix)/share/man/man1
 man5dir = $(prefix)/share/man/man5
 man7dir = $(prefix)/share/man/man7
@@ -21,73 +15,74 @@ man1ext = .1
 man5ext = .5
 man7ext = .7
 
-INSTALL = install -o 0 -g 0 -D
+# project directories
+docdir = $(topdir)/doc
+incdir = $(topdir)/include
 
-# build programs
-CC      = gcc
-CFLAGS  = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g
-ALLCFLAGS = -I $(INC) $(CFLAGS)
-CPPFLAGS = -DPSNETLOG -D_Noreturn=__attribute\(\(noreturn\)\)
-LDFLAGS = -pthread
+export docdir incdir
 
-# targets
-OFILES = $(BIN)/request.o $(BIN)/response.o $(BIN)/client.o $(BIN)/deltalist.o \
-	  $(BIN)/udpserver.o $(BIN)/tcpserver.o $(BIN)/ini.o $(BIN)/common.o \
-	  $(BIN)/jsmn.o
-DIROFILES = $(BIN)/dirservice.o
-NODEOFILES = $(BIN)/nodeservice.o $(BIN)/router.o $(BIN)/dirclient.o \
-	     $(BIN)/nodelist.o $(BIN)/msgcache.o
-ALLOFILES = $(OFILES) $(DIROFILES) $(NODEOFILES)
-DFILES = $(addprefix $(DEP)/,$(addsuffix .d,$(basename $(notdir $(ALLOFILES)))))
-XFILES = $(BIN)/psdird $(BIN)/psnoded
+AR        = ar
+ARFLAGS   = rcs
+CC        = gcc
+CFLAGS    = -Wall -Wextra -Werror -Wno-unused-parameter -std=gnu99 -g
+ALLCFLAGS = -I $(incdir) $(CFLAGS)
+CPPFLAGS  = -DPSNETLOG -D_Noreturn=__attribute\(\(noreturn\)\)
+LD        = gcc
+LDFLAGS   = -pthread
+INSTALL   = install -o 0 -g 0 -D
 
-all: $(XFILES)
+LIBS = $(topdir)/common/psnet-common.a
 
--include $(DFILES)
+export AR ARFLAGS CC CFLAGS ALLCFLAGS CPPFLAGS LD LDFLAGS
+export LIBS
 
-$(BIN)/psdird: $(OFILES) $(DIROFILES)
-	$(CC) $(ALLCFLAGS) $(LDFLAGS) $^ -o $@
+# sub-makes
+tracker = tracker
+router  = router
+common  = common
+submakes = $(tracker) $(router) $(common)
 
-$(BIN)/psnoded: $(OFILES) $(NODEOFILES)
-	$(CC) $(ALLCFLAGS) $(LDFLAGS) $^ -o $@
+all: $(submakes)
 
-# build binaries in $(BIN)
-$(BIN)/%.o: $(SRC)/%.c
-	$(CC) -c $(ALLCFLAGS) $(CPPFLAGS) $< -o $@
+include rules.mk
 
-README: doc/psnet_protocol
-	groff -man -Tascii $< | col -bx > $@
+# install(src,dst,opts)
+cmd_install = @$(if $(quiet),echo '  INSTALL $(2)' &&) $(INSTALL) $(3) $(1) $(2)
 
-# automatically generate dependencies
-$(DEP)/%.d: $(SRC)/%.c
-	@echo "Generating dependencies for $<"
-	@echo "$@ $(BIN)/`$(CC) -MM -I $(INC) $(CPPFLAGS) $<`" > $@
+do_submake = +@$(if $(quiet),echo '  MAKE    $@' &&) cd $@ && $(MAKE)
+
+$(tracker): $(common)
+	$(do_submake)
+
+$(router): $(common)
+	$(do_submake)
+
+$(common):
+	$(do_submake)
+
+README: $(docdir)/psnet_protcol
+	$(call cmd,groff)
 
 install: all
-	$(INSTALL) $(BIN)/psdird $(bindir)/psdird
-	$(INSTALL) $(BIN)/psnoded $(bindir)/psnoded
-	$(INSTALL) -m 0644 $(DOC)/psnet_protocol $(man7dir)/psnet_protocol$(man7ext)
-	$(INSTALL) -m 0644 $(DOC)/psnetrc $(man5dir)/psnetrc$(man5ext)
-	$(INSTALL) -m 0644 $(DOC)/psdird $(man1dir)/psdird$(man1ext)
-	$(INSTALL) -m 0644 $(DOC)/psnoded $(man1dir)/psnoded$(man1ext)
+	$(call cmd_install, $(tracker)/pstrackd, $(bindir)/pstrackd)
+	$(call cmd_install, $(docdir)/psnet_protocol, $(man7dir)/psnet_protocol$(man7ext), -m 0644)
+	$(call cmd_install, $(docdir)/psnetrc, $(man5dir)/psnetrc$(man5ext), -m 0644)
+	$(call cmd_install, $(docdir)/pstrackd, $(man1dir)/pstrackd$(man1ext), -m 0644)
 
-clean:
-	rm -f $(DIROFILES) $(NODEOFILES) $(OFILES) $(XFILES)
+clean: topclean
+topclean:
+	@cd $(common) && $(MAKE) clean
+	@cd $(tracker) && $(MAKE) clean
+	@cd $(router) && $(MAKE) clean
 
-depclean:
-	rm -f $(DEP)/*
+distclean: topdistclean
+topdistclean:
+	@cd $(common); $(MAKE) distclean
+	@cd $(tracker); $(MAKE) distclean
+	@cd $(router); $(MAKE) distclean
 
-dirclean:
-	rm -f $(OFILES) $(DIROFILES) $(BIN)/psdird
-
-nodeclean:
-	rm -f $(OFILES) $(NODEOFILES) $(BIN)/psnoded
-
-dirmem: $(BIN)/psdird
+dirmem: $(tracker)/pstrackd
 	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
-	    --num-callers=20 --track-fds=yes $(BIN)/psdird
+	    --num-callers=20 --track-fds=yes $(tracker)/pstrackd
 
-nodemem: $(BIN)/psnoded
-	valgrind --tool=memcheck --leak-check=yes --show-reachable=yes \
-	    --num-callers=20 --track-fds=yes $(BIN)/psnoded
-
+.PHONY: $(submakes) topclean topdistclean

@@ -1,0 +1,4 @@
+This library exists to capture the common code between the psnet directory and
+router, so that maintaining them as separate projects is feasible.  It contains
+code for general TCP/UDP communication (send/recv/etc. wrappers), TCP/UDP
+servers, JSON parsing, and messaging according to the psnet protocol.

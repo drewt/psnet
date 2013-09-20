@@ -1,16 +1,16 @@
 .\" Process this file with
 .\" groff -man -Tascii psnet_protocol
 .\"
-.TH PSNET_PROTOCOL 7 "MAY 2013" Linux "PSNet Manual"
+.TH PSNET_PROTOCOL 7 "MAY 2013" Linux "psnet Manual"
 .SH NAME
-psnet protocol \- protocol of the PSNet overlay network
+psnet protocol \- protocol of the psnet overlay network
 .SH DESCRIPTION
-PSNet is an overlay network that serves as middleware for unreliable broadcast
+psnet is an overlay network that serves as middleware for unreliable broadcast
 messaging.
 .SH PROCESSES
-.B psdird
+.B pstrackd
 .RS
-The "directory" server.  This process is responsible for maintaining a list of
+The tracker.  This process is responsible for maintaining a list of
 routers available on the network.  It should be run at a well-known address so
 that routers and clients know where to find it.
 .RE
@@ -21,32 +21,33 @@ The overlay router, or node.  This process is responsible for maintaining a list
 of connected clients, delivering messages to them, and forwarding messages sent
 by their clients for broadcast.
 .SH CONNECTIONS
-.B psdird
+.B pstrackd
 and
 .B psnoded
 maintain virtual "connections" to their clients over UDP, by means of keep-alive
 messages.  In the case of
-.B psdird
-clients are routers, and the purpose of the connection is to have the directory
+.B pstrackd
+clients are routers, and the purpose of the connection is to have the tracker
 advertise the router's location both to other routers in the network and to
 potential clients.
 .B psnoded
 clients are processes which intend to send or receive broadcast messages.  They
 connect to routers in order to receive broadcast messages from them.
 .SH "JOINING THE NETWORK"
-The PSNet directory serves as the entry point into the network, both for routers
+The psnet tracker serves as the entry point into the network, both for routers
 and for their clients.  When a router or client wants to join to the network,
-they request information about some number of routers from the directory (a
-"list request").  A router can then connect to the directory (in order to gain
+they request information about some number of routers from the tracker (a
+"list request").  A router can then connect to the tracker (in order to gain
 clients) and begin forwarding messages to the routers it learned about from the 
-list request.  A client may simply request information about a single router and then connect to it.
+list request.  A client may simply request information about a single router
+and then connect to it.
 
-In case the directory is unavailable, but the address of a router is known,
-clients may send list requests to routers.  They may also send a "directory
-request" to discover the location of a directory, if one is available (XXX: not
+In case the tracker is unavailable, but the address of a router is known,
+clients may send list requests to routers.  They may also send a "tracker
+request" to discover the location of a tracker, if one is available (XXX: not
 implemented!).
 .SH MESSAGES
-The PSNet protocol uses JSON for messages.  The structure of any PSNet message
+The psnet protocol uses JSON for messages.  The structure of any psnet message
 is either:
 
 {
@@ -78,9 +79,9 @@ less than 512 bytes in length, and end in the double CRLF sequence.
 .RS
 The purpose of a
 .I connect
-message is to maintain a connection with either a PSNet directory or router.
+message is to maintain a connection with either a psnet tracker or router.
 Note that there is no distinction between establishing and maintaining a
-connection in PSNet.  The message structure is:
+connection in psnet.  The message structure is:
 
 {
     "method":"connect",
@@ -88,7 +89,7 @@ connection in PSNet.  The message structure is:
 .sp 0
 }
 
-where [port] is the port the client is listening on for PSNet messages.  This
+where [port] is the port the client is listening on for psnet messages.  This
 message should be sent over UDP.
 .RE
 
@@ -96,8 +97,8 @@ message should be sent over UDP.
 .RS
 The purpose of a
 .I disconnect
-message is to promptly terminate a connection with either a PSNet directory or
-router.  Depending on the configuration of the directory or router, prompt
+message is to promptly terminate a connection with either a psnet tracker or
+router.  Depending on the configuration of the tracker or router, prompt
 termination may be desirable; however, if the server's expiration interval is
 small, it may be better to simply discontinue sending
 .I connect
@@ -117,8 +118,8 @@ This message should be sent over UDP.
 .RS
 The purpose of a
 .I list
-message is to request the network addresses of some number of PSNet routers,
-from either a directory or a router.
+message is to request the network addresses of some number of psnet routers,
+from either a tracker or a router.
 The message structure is:
 
 {
@@ -157,7 +158,7 @@ section.
 .RS
 The purpose of an
 .I info
-message is to request information about the state of a directory or router. The
+message is to request information about the state of a tracker or router. The
 message structure is:
 
 {
@@ -183,14 +184,14 @@ or
 .I discover
 request.
 
-A directory will respond as follows:
+A tracker will respond as follows:
 
 {
     "name":[name]
 .sp 0
 }
 
-where [name] is some string identifying the directory.
+where [name] is some string identifying the tracker.
 .RE
 
 .I broadcast
@@ -224,4 +225,4 @@ WARRANTY, to the extent permitted by law.
 http://github.com/drewt/psnet
 .SH "SEE ALSO"
 .BR psnoded (1)
-.BR psdird (1)
+.BR pstrackd (1)

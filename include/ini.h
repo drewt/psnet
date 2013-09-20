@@ -1,9 +1,7 @@
-/* Copyright 2013 Drew Thoreson */
-
 /* inih -- simple .INI file parser
 
-inih is released under the New BSD license (see LICENSE.txt). Go to the project
-home page for more info:
+inih is released under the New BSD license (see LICENSE-inih). Go to the
+project home page for more info:
 
 http://code.google.com/p/inih/
 

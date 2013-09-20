@@ -27,17 +27,18 @@
 #include <pthread.h>
 #include <getopt.h>
 
+#include "ini.h"
 #define JSMN_STRICT
 #include "jsmn.h"
-#include "ini.h"
 
-#include "common.h"
-#include "tcp.h"
-#include "udp.h"
-#include "response.h"
 #include "client.h"
-#include "router.h"
+#include "misc.h"
 #include "msgcache.h"
+#include "network.h"
+#include "parse.h"
+#include "protocol.h"
+#include "router.h"
+#include "server.h"
 
 #define RC_FILE "/etc/psnetrc"
 
@@ -58,7 +59,7 @@ static struct settings {
     .listen_port = "5555",
 };
 
-#define node_error(sock, no) send_error (sock, no, psnode_strerror[no])
+#define node_error(sock, no) psnet_send_error (sock, no, psnode_strerror[no])
 enum input_errors { ENOMETHOD, ENONUM, EBADMETHOD, EBADNUM };
 static const char *psnode_strerror[] = {
     [ENOMETHOD]  = "no method given",
@@ -112,7 +113,7 @@ static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 //-----------------------------------------------------------------------------
 static void process_ping (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    send_ok (mi->sock);
+    psnet_send_ok (mi->sock);
 
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "P %s %d\n" ANSI_RESET, mi->paddr,
@@ -180,8 +181,8 @@ static void process_broadcast (struct msg_info *mi, jsmntok_t *tok, int ntok)
 //-----------------------------------------------------------------------------
 static void process_discover (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    struct response_node head;
-    struct response_node *jlist;
+    LIST_HEAD(head);
+    LIST_HEAD(jlist);
     int num;
 
     if ((num = jsmn_get_value (mi->msg, tok, "num")) == -1) {
@@ -195,9 +196,9 @@ static void process_discover (struct msg_info *mi, jsmntok_t *tok, int ntok)
     }
 
     routers_to_json (&jlist, num);
-    make_response_with_body (&head, jlist);
-    send_response (mi->sock, head.next);
-    free_response (head.next);
+    make_response_with_body (&head, &jlist);
+    psnet_send_response (mi->sock, &head);
+    free_response (&head);
 
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "L %s\n" ANSI_RESET, mi->paddr);
@@ -216,7 +217,7 @@ static void *handle_connection (void *data)
 
     for(;;) {
 
-        if (!tcp_read_message (mi->sock, mi->msg))
+        if (tcp_read_msg (mi->sock, mi->msg, MSG_MAX) <= 0)
             break; // connection closed by client
 
         // dispatch

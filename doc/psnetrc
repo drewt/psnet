@@ -1,20 +1,20 @@
 .\" Process this file with
-.\" groff -man -Tascii psdird.1
+.\" groff -man -Tascii pstrackd.1
 .\"
-.TH PSNETRC 5 "MAY 2013" Linux "PSNet Manual"
+.TH PSNETRC 5 "MAY 2013" Linux "psnet Manual"
 .SH NAME
-psnetrc \- PSNet configuration file
+psnetrc \- psnet configuration file
 .SH SYNOPSIS
 /etc/psnetrc
 .SH DESCRIPTION
-.B psdird
+.B pstrackd
 and
 .B psnoded
 will attempt to read
 .I psnetrc
 when they are started.  The configuration file is divided into two sections,
-"Directory" and "Router", for
-.B psdird
+"Tracker" and "Router", for
+.B pstrackd
 and
 .B psnoded
 respectively.  Any option which can be specified on the command line may be
@@ -24,19 +24,19 @@ are identical to the long-version names of command line options.
 .SH EXAMPLE
 #
 .sp 0
-# psnetrc - router connecting to local directory
+# psnetrc - router connecting to local tracker
 .sp 0
 #
 .sp 0
-[Directory]
+[Tracker]
 .sp 0
 listen-port=6666
 
 [Router]
 .sp 0
-directory-address=127.0.0.1
+tracker-address=127.0.0.1
 .sp 0
-directory-port=6666
+tracker-port=6666
 .sp 0
 listen-port=5555
 .SH AUTHOR
@@ -51,4 +51,4 @@ WARRANTY, to the extent permitted by law.
 http://github.com/drewt/psnet
 .SH "SEE ALSO"
 .BR psnoded (1)
-.BR psdird (1)
+.BR pstrackd (1)

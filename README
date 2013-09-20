@@ -1,190 +1,34 @@
-PSNET_PROTOCOL(7)                psnet Manual                PSNET_PROTOCOL(7)
+PSTRACKD(1)                      psnet Manual                      PSTRACKD(1)
 
 
 
 NAME
-       psnet protocol - protocol of the psnet overlay network
+       pstrackd - psnet tracker daemon
+
+SYNOPSIS
+       pstrackd [options]
 
 DESCRIPTION
-       psnet  is  an  overlay network that serves as middleware for unreliable
-       broadcast messaging.
+       The  psnet  tracker daemon maintains a list of psnet routers and serves
+       it to clients (including psnet routers) on demand.  Each  psnet  router
+       theoretically  corresponds  to  a  single,  disjoint network, though in
+       practice topologies may be  more  complicated  (for  example,  if  some
+       routers connect to multiple trackers).
 
-PROCESSES
-       psdird
-              The "directory" server.  This process is responsible  for  main-
-              taining  a  list of routers available on the network.  It should
-              be run at a well-known address so that routers and clients  know
-              where to find it.
+OPTIONS
+       -l, --listen-port <port>
+              The port to listen on for client requests.
 
-       psnoded
-              The  overlay  router,  or node.  This process is responsible for
-              maintaining a list of connected clients, delivering messages  to
-              them,  and  forwarding messages sent by their clients for broad-
-              cast.
+       -t, --max-threads <threads>
+              The maximum number of clients to service concurrently.
 
-CONNECTIONS
-       psdird and psnoded maintain virtual "connections" to their clients over
-       UDP,  by  means  of keep-alive messages.  In the case of psdird clients
-       are routers, and the purpose of the connection is to have the directory
-       advertise  the  router's  location both to other routers in the network
-       and to potential clients.  psnoded clients are processes  which  intend
-       to  send  or  receive  broadcast  messages.  They connect to routers in
-       order to receive broadcast messages from them.
-
-JOINING THE NETWORK
-       The psnet directory serves as the entry point into  the  network,  both
-       for  routers  and  for their clients.  When a router or client wants to
-       join to the network, they request  information  about  some  number  of
-       routers  from the directory (a "list request").  A router can then con-
-       nect to the directory (in order to gain clients) and  begin  forwarding
-       messages  to  the  routers  it  learned about from the list request.  A
-       client may simply request information about a single  router  and  then
-       connect to it.
-
-       In  case  the  directory is unavailable, but the address of a router is
-       known, clients may send list requests to routers.  They may also send a
-       "directory  request" to discover the location of a directory, if one is
-       available (XXX: not implemented!).
-
-MESSAGES
-       The psnet protocol uses JSON for messages.  The structure of any  psnet
-       message is either:
-
-       {
-           [key]: [value],
-           ...
-       }
-
-       where  keys  are  strings  and  values are (potentially) any valid JSON
-       value, or:
-
-       [{"ip":[ip], "port":[port], "ipv":[ip version]}, ...]
-
-       in the case of list and discover requests, where [ip] is an IP address,
-       [port] is a port number, and [ip version] is either 4 or 6.
-
-       Any message of variable length will begin with a header, as follows:
-
-       {
-           "status":[status],
-           "size":[size],
-           ...
-       }
-
-       where  [size]  is  the  length, in bytes, of the message body.  Headers
-       must be less than 512 bytes in length,  and  end  in  the  double  CRLF
-       sequence.
-
-MESSAGE TYPES
-       connect
-              The  purpose  of  a  connect message is to maintain a connection
-              with either a psnet directory or router.  Note that there is  no
-              distinction between establishing and maintaining a connection in
-              psnet.  The message structure is:
-
-              {
-                  "method":"connect",
-                  "port":[port]
-              }
-
-              where [port] is the port the client is listening  on  for  psnet
-              messages.  This message should be sent over UDP.
-
-       disconnect
-              The  purpose  of a disconnect message is to promptly terminate a
-              connection with either a psnet directory or  router.   Depending
-              on the configuration of the directory or router, prompt termina-
-              tion may be  desirable;  however,  if  the  server's  expiration
-              interval  is small, it may be better to simply discontinue send-
-              ing connect messages.  The message structure is:
-
-              {
-                  "method":"disconnect",
-                  "port":[port]
-              }
-
-              where [port] is the port the client has previously advertised to
-              the server.  This message should be sent over UDP.
-
-       list
-              The  purpose  of  a  list  message  is  to  request  the network
-              addresses of some number of psnet routers, from either a  direc-
-              tory or a router.  The message structure is:
-
-              {
-                  "method":"list",
-                  "num":[num]
-              }
-
-              where [num] is the (maximum) number of addresses which should be
-              returned.  The structure of the response  is  described  in  the
-              MESSAGES section.
-
-       discover
-              Discover  messages  are much like list messages, except that the
-              address of the requesting client will not  be  included  in  the
-              response.  The message structure is:
-
-              {
-                  "method":"discover",
-                  "num":[num],
-                  "port":[port]
-              }
-
-              where [num] is the (maximum) number of addresses which should be
-              returned, and [port] is the port number  the  requesting  entity
-              has  previously  advertised to the server.  The structure of the
-              response is described in the MESSAGES section.
-
-       info
-              The purpose of an info message is to request  information  about
-              the state of a directory or router. The message structure is:
-
-              {
-                  "method":"info"
-              }
-
-              A router will respond as follows:
-
-              {
-                  "name":[name],
-                  "clients":[clients],
-                  "cache-load":[load]
-              }
-
-              where [name] is some string identifying the router, [clients] is
-              the number of clients connected to the router, and [load] is the
-              number of messages in the router's message cache.  This informa-
-              tion may be used to select an underutilized router from  a  list
-              obtained by a list or discover request.
-
-              A directory will respond as follows:
-
-              {
-                  "name":[name]
-              }
-
-              where [name] is some string identifying the directory.
-
-       broadcast
-              A  message intended for broadcast to all clients in the network.
-              The message structure is:
-
-              {
-                  "method":"broadcast",
-                  "hops":0,
-                  "id":[id],
-                  "data":[data]
-              }
-
-              where [id] is a string identifying the message,  and  [data]  is
-              any  valid JSON value.  Clients should take care to choose an ID
-              that is unlikely to be in use already, since routers use IDs  to
-              filter  duplicate  messages.  If two IDs match, one will be con-
-              sidered a duplicate and it will  be  discarded.   On  the  other
-              hand,  two  clients  might  deliberately send identical messages
-              (with identical IDs) in order to increase network penetration or
-              to increase the speed of delivery.
+FILES
+       /etc/psnetrc
+              Config  file.   Any option that can be given on the command line
+              can be given in this file instead.  Option names are the same as
+              the  long version of the corresponding command line option (e.g.
+              "max-threads=1000").  Settings for the tracker should  be  under
+              the "Tracker" section in this file.
 
 AUTHOR
        Drew Thoreson <drew.thoreson@alumni.ubc.ca>
@@ -199,8 +43,8 @@ WWW
        http://github.com/drewt/psnet
 
 SEE ALSO
-       psnoded(1) psdird(1)
+       psnoded(1)
 
 
 
-Linux                              MAY 2013                  PSNET_PROTOCOL(7)
+Linux                              MAY 2013                        PSTRACKD(1)

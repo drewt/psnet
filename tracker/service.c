@@ -29,21 +29,22 @@
 #include <time.h>
 #include <getopt.h>
 
-#include "jsmn.h"
 #include "ini.h"
+#include "jsmn.h"
 
-#include "common.h"
-#include "tcp.h"
-#include "udp.h"
-#include "response.h"
 #include "client.h"
+#include "misc.h"
+#include "network.h"
+#include "parse.h"
+#include "protocol.h"
+#include "server.h"
 
 #define RC_FILE "/etc/psnetrc"
 
 #define HDR_OK_FMT "{\"status\":\"okay\",\"size\":%d}\r\n\r\n"
 #define HDR_OK_STRLEN (29 + 5)
 
-#define dir_error(sock, no) send_error (sock, no, psdir_strerror[no])
+#define dir_error(sock, no) psnet_send_error (sock, no, psdir_strerror[no])
 enum input_errors { ENOMETHOD,ENONUM,ENOPORT,EBADMETHOD,EBADNUM,EBADPORT };
 static const char *psdir_strerror[] = {
     [ENOMETHOD]  = "no method given",
@@ -68,10 +69,10 @@ static struct settings {
 static void process_info (struct msg_info *mi, jsmntok_t *tok, size_t ntok)
 {
     char hdr[HDR_OK_STRLEN];
-    char rsp[49 + 10]; /* space for 10-digit router count */
+    char rsp[47 + 10]; /* space for 10-digit router count */
     int hdr_len, rsp_len;
 
-    rsp_len = sprintf (rsp, "{\"name\":\"generic psnet directory\","
+    rsp_len = sprintf (rsp, "{\"name\":\"generic psnet tracker\","
             "\"routers\":%d}\r\n\r\n", client_list_size());
     hdr_len = sprintf (hdr, HDR_OK_FMT, rsp_len);
 
@@ -126,8 +127,8 @@ static void process_disconnect (struct msg_info *mi, jsmntok_t *tok, int ntok)
 //-----------------------------------------------------------------------------
 static void process_list (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    struct response_node head;
-    struct response_node *jlist;
+    LIST_HEAD(head);
+    LIST_HEAD(jlist);
     int num;
  
     if ((num = jsmn_get_value (mi->msg, tok, "num")) == -1) {
@@ -141,9 +142,9 @@ static void process_list (struct msg_info *mi, jsmntok_t *tok, int ntok)
         return;
     }
 
-    make_response_with_body (&head, jlist);
-    send_response (mi->sock, head.next);
-    free_response (head.next);
+    make_response_with_body (&head, &jlist);
+    psnet_send_response (mi->sock, &head);
+    free_response (&head);
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "L %s\n" ANSI_RESET, mi->paddr);
 #endif
@@ -154,8 +155,8 @@ static void process_list (struct msg_info *mi, jsmntok_t *tok, int ntok)
 //-----------------------------------------------------------------------------
 static void process_discover (struct msg_info *mi, jsmntok_t *tok, int ntok)
 {
-    struct response_node head;
-    struct response_node *jlist;
+    LIST_HEAD(head);
+    LIST_HEAD(jlist);
     int num, port;
     int iport;
 
@@ -182,9 +183,9 @@ static void process_discover (struct msg_info *mi, jsmntok_t *tok, int ntok)
         return;
     }
 
-    make_response_with_body (&head, jlist);
-    send_response (mi->sock, head.next);
-    free_response (head.next);
+    make_response_with_body (&head, &jlist);
+    psnet_send_response (mi->sock, &head);
+    free_response (&head);
 #ifdef PSNETLOG
     printf (ANSI_YELLOW "L %s %s\n" ANSI_RESET, mi->paddr,
             mi->msg + tok[port].start);
@@ -203,7 +204,7 @@ static void *handle_connection (void *data)
 
     for(;;) {
 
-        if (!tcp_read_message (mi->sock, mi->msg))
+        if (tcp_read_msg(mi->sock, mi->msg, MSG_MAX) <= 0)
             break; // connection closed by client
 
         // dispatch
@@ -291,7 +292,7 @@ static int ini_handler (void *user, const char *section, const char *name,
 {
     int val;
 
-    if (strcmp (section, "Directory"))
+    if (strcmp (section, "Tracker"))
         return 1;
 
     if (!strcmp (name, "listen-port")) {
@@ -359,9 +360,6 @@ void parse_opts (int argc, char *argv[], struct settings *dst)
     }
 }
 
-/*-----------------------------------------------------------------------------
- * Main... */
-//-----------------------------------------------------------------------------
 int main (int argc, char *argv[])
 {
     int sockfd;

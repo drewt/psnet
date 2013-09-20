@@ -1,17 +1,17 @@
 .\" Process this file with
-.\" groff -man -Tascii psdird.1
+.\" groff -man -Tascii pstrackd.1
 .\"
-.TH PSDIRD 1 "MAY 2013" Linux "PSNet Manual"
+.TH PSTRACKD 1 "MAY 2013" Linux "psnet Manual"
 .SH NAME
-psdird \- PSNet directory daemon
+pstrackd \- psnet tracker daemon
 .SH SYNOPSIS
-.B psdird [options]
+.B pstrackd [options]
 .SH DESCRIPTION
-The PSNet directory daemon maintains a list of PSNet routers and serves it to
-clients (including PSNet routers) on demand.  Each PSNet router theoretically
+The psnet tracker daemon maintains a list of psnet routers and serves it to
+clients (including psnet routers) on demand.  Each psnet router theoretically
 corresponds to a single, disjoint network, though in practice topologies may be
 more complicated (for example, if some routers connect to multiple
-directories).
+trackers).
 .SH OPTIONS
 .IP "-l, --listen-port <port>"
 The port to listen on for client requests.
@@ -23,7 +23,7 @@ The maximum number of clients to service concurrently.
 Config file.  Any option that can be given on the command line can be given in
 this file instead.  Option names are the same as the long version of the
 corresponding command line option (e.g. "max-threads=1000").  Settings for
-the directory should be under the "Directory" section in this file.
+the tracker should be under the "Tracker" section in this file.
 .SH AUTHOR
 Drew Thoreson <drew.thoreson@alumni.ubc.ca>
 .SH COPYRIGHT
