@@ -83,6 +83,11 @@ PSNET *psnet_new(const char *host, const char *port);
  */
 void psnet_free(PSNET *p);
 
+static inline struct sockaddr *psnet_list_entry_addr(struct list_head *entry)
+{
+	return (struct sockaddr*) &((struct psnet_list_entry*)entry)->addr;
+}
+
 /*
  * Writes the (human-readable) IP address associated with the given PSNET
  * handle into the buffer dst.
