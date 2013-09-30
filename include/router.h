@@ -34,8 +34,8 @@
 struct msg_info;
 struct response_node;
 
-int router_init (char *dir_addr, char *dir_port, char *listen_port);
-void flood_message (struct msg_info *mi);
-void routers_to_json (struct list_head *head, int n);
+int router_init(char *dir_addr, char *dir_port, char *listen_port);
+void flood_message(struct msg_info *mi);
+void routers_to_json(struct list_head *head, int n);
 
 #endif

@@ -24,12 +24,12 @@
 extern int num_threads;
 extern pthread_mutex_t num_threads_lock;
 
-int tcp_server_init (char *port);
+int tcp_server_init(char *port);
 
-_Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*));
+_Noreturn void tcp_server_main(int sock, int max_threads, void*(*cb)(void*));
 
-int udp_server_init (char *port);
+int udp_server_init(char *port);
 
-_Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*));
+_Noreturn void udp_server_main(int sock, int max_threads, void *(*cb)(void*));
 
 #endif

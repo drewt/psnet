@@ -23,32 +23,32 @@
 
 #include "misc.h"
 
-void daemonize (const char *log_file)
+void daemonize(const char *log_file)
 {
-    pid_t pid, sid;
+	pid_t pid, sid;
 
-    pid = fork ();
-    if (pid == -1) {
-        perror ("fork");
-        exit (EXIT_FAILURE);
-    }
-    if (pid > 0)
-        exit (EXIT_SUCCESS);
+	pid = fork();
+	if (pid == -1) {
+		perror("fork");
+		exit(EXIT_FAILURE);
+	}
+	if (pid > 0)
+		exit(EXIT_SUCCESS);
 
-    umask (0);
+	umask(0);
 
-    freopen (log_file, "w", stdout);
-    freopen (log_file, "w", stderr);
-    fclose (stdin);
+	freopen(log_file, "w", stdout);
+	freopen(log_file, "w", stderr);
+	fclose(stdin);
 
-    sid = setsid ();
-    if (sid == -1) {
-        perror ("setsid");
-        exit (EXIT_FAILURE);
-    }
+	sid = setsid();
+	if (sid == -1) {
+		perror("setsid");
+		exit(EXIT_FAILURE);
+	}
 
-    if (chdir ("/") == -1) {
-        perror ("chdir");
-        exit (EXIT_FAILURE);
-    }
+	if (chdir("/") == -1) {
+		perror("chdir");
+		exit(EXIT_FAILURE);
+	}
 }

@@ -31,6 +31,6 @@
 #define ANSI_RESET  "\x1b[0m"
 #endif
 
-void daemonize (const char *log_file);
+void daemonize(const char *log_file);
 
 #endif

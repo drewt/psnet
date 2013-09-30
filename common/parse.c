@@ -156,13 +156,13 @@ int parse_header (int *status, size_t *size, char *msg)
 
 int parse_message (const char *msg, jsmntok_t *tok, size_t *ntok)
 {
-    int rc;
-    jsmn_parser p;
+	int rc;
+	jsmn_parser p;
 
-    jsmn_init (&p);
-    rc = jsmn_parse (&p, msg, tok, *ntok);
-    if (rc != JSMN_SUCCESS || tok[0].type != JSMN_OBJECT)
-        return -1;
-    *ntok =  p.toknext;
-    return jsmn_get_value (msg, tok, "method");
+	jsmn_init (&p);
+	rc = jsmn_parse (&p, msg, tok, *ntok);
+	if (rc != JSMN_SUCCESS || tok[0].type != JSMN_OBJECT)
+		return -1;
+	*ntok =  p.toknext;
+	return jsmn_get_value (msg, tok, "method");
 }

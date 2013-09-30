@@ -44,6 +44,6 @@ int parse_header(int *status, size_t *size, char *msg);
  */
 int parse_node_list(struct list_head *head, char *msg, int nentries);
 
-int parse_message (const char *msg, jsmntok_t *tok, size_t *ntok);
+int parse_message(const char *msg, jsmntok_t *tok, size_t *ntok);
 
 #endif

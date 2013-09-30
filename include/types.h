@@ -64,12 +64,12 @@ struct response_node {
  * A UDP or TCP message from a client.
  */
 struct msg_info {
-    int sock;
-    int socktype;
-    size_t len;
-    struct sockaddr_storage addr;
-    char msg[MSG_MAX];
-    char paddr[INET6_ADDRSTRLEN];
+	int sock;
+	int socktype;
+	size_t len;
+	struct sockaddr_storage addr;
+	char msg[MSG_MAX];
+	char paddr[INET6_ADDRSTRLEN];
 };
 
 /*

@@ -95,9 +95,6 @@ static int make_client(struct sockaddr_storage *addr, const char *port)
 	return 0;
 }
 
-/*-----------------------------------------------------------------------------
- * Adds a client to the network */
-//-----------------------------------------------------------------------------
 int add_client(struct sockaddr_storage *addr, const char *port)
 {
 	struct sockaddr_storage *client;
@@ -112,9 +109,6 @@ int add_client(struct sockaddr_storage *addr, const char *port)
 	return 0;
 }
 
-/*-----------------------------------------------------------------------------
- * Removes a client from the network */
-//-----------------------------------------------------------------------------
 int remove_client(struct sockaddr_storage *addr, const char *port)
 {
 	struct sockaddr_storage client = *addr;
@@ -135,10 +129,10 @@ struct make_list_arg {
 	int n;
 };
 
-/*-----------------------------------------------------------------------------
+/*
  * Constructs a JSON representation of the given client structure and inserts
- * it into the list given in the argument */
-//-----------------------------------------------------------------------------
+ * it into the list given in the argument.
+ */
 static int make_list(const void *data, void *arg)
 {
 	const struct sockaddr_storage *client = data;
@@ -166,10 +160,10 @@ static int make_list(const void *data, void *arg)
 	return 0;
 }
 
-/*-----------------------------------------------------------------------------
+/*
  * Constructs a JSON array from the server's list of clients, excluding the
- * client given by the supplied sockaddr structure */
-//-----------------------------------------------------------------------------
+ * client given by the supplied sockaddr structure.
+ */
 int clients_to_json(struct list_head *head, struct sockaddr_storage *ign,
         const char *n)
 {

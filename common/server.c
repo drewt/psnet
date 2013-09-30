@@ -37,211 +37,206 @@
 
 #define LOG_FILE_PATH "/tmp/p2pservlog"
 
-/*-----------------------------------------------------------------------------
- * Initialize the server to listen on the given port */
-//-----------------------------------------------------------------------------
-int tcp_server_init (char *port)
+int tcp_server_init(char *port)
 {
-    struct addrinfo hints, *servinfo, *p;
-    const int yes = 1;
-    int sockfd;
-    int rc;
+	struct addrinfo hints, *servinfo, *p;
+	const int yes = 1;
+	int sockfd;
+	int rc;
 
-    memset (&hints, 0, sizeof (hints));
-    hints.ai_family   = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags    = AI_PASSIVE;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family   = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags    = AI_PASSIVE;
 
-    if ((rc = getaddrinfo (NULL, port, &hints, &servinfo))) {
-        fprintf (stderr, "tcpserver: getaddrinfo: %s\n", gai_strerror (rc));
-        exit (EXIT_FAILURE);
-    }
+	if ((rc = getaddrinfo(NULL, port, &hints, &servinfo))) {
+		fprintf(stderr, "tcpserver: getaddrinfo: %s\n", gai_strerror(rc));
+		exit(EXIT_FAILURE);
+	}
 
-    // create a socket to listen for incoming connections
-    for (p = servinfo; p; p = p->ai_next) {
-        if ((sockfd = socket (p->ai_family, p->ai_socktype,
-                        p->ai_protocol)) == -1) {
-            perror ("tcpserver: socket");
-            continue;
-        }
+	/* create a socket to listen for incoming connections */
+	for (p = servinfo; p; p = p->ai_next) {
+		sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+		if (sockfd == -1) {
+			perror("tcpserver: socket");
+			continue;
+		}
 
-        if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-                    sizeof (int)) == -1) {
-            perror ("tcpserver: setsockopt");
-            exit (EXIT_FAILURE);
-        }
+		if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+				sizeof(int)) == -1) {
+			perror("tcpserver: setsockopt");
+			exit(EXIT_FAILURE);
+		}
 
-        if (bind (sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close (sockfd);
-            perror ("tcpserver: bind");
-            continue;
-        }
+		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(sockfd);
+			perror("tcpserver: bind");
+			continue;
+		}
 
-        break;
-    }
+		break;
+	}
 
-    if (!p) {
-        fprintf (stderr, "tcpserver: failed to bind\n");
-        exit (EXIT_FAILURE);
-    }
+	if (!p) {
+		fprintf(stderr, "tcpserver: failed to bind\n");
+		exit(EXIT_FAILURE);
+	}
 
-    freeaddrinfo (servinfo);
+	freeaddrinfo(servinfo);
 
-    if (listen (sockfd, BACKLOG) == -1) {
-        perror ("tcpserver: listen");
-        exit (EXIT_FAILURE);
-    }
+	if (listen(sockfd, BACKLOG) == -1) {
+		perror("tcpserver: listen");
+		exit(EXIT_FAILURE);
+	}
 
-    return sockfd;
+	return sockfd;
 }
 
-/*-----------------------------------------------------------------------------
- * The server's main accept() loop */
-//-----------------------------------------------------------------------------
-_Noreturn void tcp_server_main (int sock, int max_threads, void*(*cb)(void*))
+_Noreturn void tcp_server_main(int sock, int max_threads, void*(*cb)(void*))
 {
-    socklen_t sin_size;
-    struct msg_info *targ;
-    pthread_t tid;
+	socklen_t sin_size;
+	struct msg_info *targ;
+	pthread_t tid;
 
-    struct timeval tv = { .tv_sec = 30, .tv_usec = 0 };
+	struct timeval tv = { .tv_sec = 30, .tv_usec = 0 };
 
-    for (;;) {
+	for (;;) {
 
-        targ = malloc (sizeof (struct msg_info));
+		targ = malloc(sizeof(struct msg_info));
 
-        // wait for a connection
-        sin_size = sizeof (targ->addr);
-        targ->sock = accept (sock, (struct sockaddr*) &targ->addr, &sin_size);
-        if (targ->sock == -1) {
-            perror ("accept");
-            free (targ);
-            continue;
-        }
+		/* wait for a connection */
+		sin_size = sizeof(targ->addr);
+		targ->sock = accept(sock, (struct sockaddr*) &targ->addr, &sin_size);
+		if (targ->sock == -1) {
+			perror("accept");
+			free(targ);
+			continue;
+		}
 
-        // close connection if thread limit reached
-        pthread_mutex_lock (&num_threads_lock);
-        if (num_threads >= max_threads) {
-            fprintf (stderr, "thread limit reached; refusing connection\n");
-            printf ("num_threads: %d\n", num_threads);
-            pthread_mutex_unlock (&num_threads_lock);
-            close (targ->sock);
-            free (targ);
-            continue;
-        }
+		/* close connection if thread limit reached */
+		pthread_mutex_lock(&num_threads_lock);
+		if (num_threads >= max_threads) {
+			fprintf(stderr, "thread limit reached; refusing connection\n");
+			pthread_mutex_unlock(&num_threads_lock);
+			close(targ->sock);
+			free(targ);
+			continue;
+		}
 
-        num_threads++;
-        pthread_mutex_unlock (&num_threads_lock);
+		num_threads++;
+		pthread_mutex_unlock(&num_threads_lock);
 
-        setsockopt (targ->sock, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv,
-                sizeof (tv));
+		setsockopt(targ->sock, SOL_SOCKET, SO_RCVTIMEO, (char*) &tv,
+				sizeof(tv));
 
 #ifdef PSNETLOG
-        inet_ntop (targ->addr.ss_family,
-                get_in_addr ((struct sockaddr*) &targ->addr),
-                targ->paddr, sizeof targ->paddr);
-        printf ("C %s\n", targ->paddr);
+		inet_ntop(targ->addr.ss_family,
+				get_in_addr((struct sockaddr*) &targ->addr),
+				targ->paddr, sizeof targ->paddr);
+		printf("C %s\n", targ->paddr);
 #endif
-        // create a new thread to service the connection
-        if (pthread_create (&tid, NULL, cb, targ))
-            perror ("pthread_create");
-        else
-            pthread_detach (tid);
-    }
+		/* create a new thread to service the connection */
+		if (pthread_create(&tid, NULL, cb, targ))
+			perror("pthread_create");
+		else
+			pthread_detach(tid);
+	}
 }
 
-int udp_server_init (char *port)
+int udp_server_init(char *port)
 {
-    struct addrinfo hints, *servinfo, *p;
-    const int yes = 1;
-    int sockfd;
-    int rc;
+	struct addrinfo hints, *servinfo, *p;
+	const int yes = 1;
+	int sockfd;
+	int rc;
 
-    memset (&hints, 0, sizeof (hints));
-    hints.ai_family   = AF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags    = AI_PASSIVE;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family   = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags    = AI_PASSIVE;
 
-    if ((rc = getaddrinfo (NULL, port, &hints, &servinfo))) {
-        fprintf (stderr, "getaddrinfo: %s\n", gai_strerror (rc));
-        exit (EXIT_FAILURE);
-    }
+	if ((rc = getaddrinfo(NULL, port, &hints, &servinfo))) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rc));
+		exit(EXIT_FAILURE);
+	}
 
-    for (p = servinfo; p; p = p->ai_next) {
-        if ((sockfd = socket (p->ai_family, p->ai_socktype,
-                        p->ai_protocol)) == -1) {
-            perror ("socket");
-            continue;
-        }
+	for (p = servinfo; p; p = p->ai_next) {
+		sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+		if (sockfd == -1) {
+			perror("socket");
+			continue;
+		}
 
-        if (setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
-                    sizeof (int)) == -1) {
-            perror ("setsockopt");
-            exit (EXIT_FAILURE);
-        }
+		if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes,
+				sizeof(int)) == -1) {
+			perror("setsockopt");
+			exit(EXIT_FAILURE);
+		}
 
-        if (bind (sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close (sockfd);
-            perror ("bind");
-            continue;
-        }
+		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(sockfd);
+			perror("bind");
+			continue;
+		}
 
-        break;
-    }
+		break;
+	}
 
-    if (!p) {
-        fprintf (stderr, "server: failed to bind\n");
-        exit (EXIT_FAILURE);
-    }
+	if (!p) {
+		fprintf(stderr, "server: failed to bind\n");
+		exit(EXIT_FAILURE);
+	}
 
-    freeaddrinfo (servinfo);
+	freeaddrinfo(servinfo);
 
-    num_threads = 0;
-    pthread_mutex_init (&num_threads_lock, NULL);
+	num_threads = 0;
+	pthread_mutex_init(&num_threads_lock, NULL);
 
-    return sockfd;
+	return sockfd;
 }
 
-_Noreturn void udp_server_main (int sock, int max_threads, void *(*cb)(void*))
+_Noreturn void udp_server_main(int sock, int max_threads, void *(*cb)(void*))
 {
-    struct msg_info *msg;
-    socklen_t sin_size;
-    ssize_t rc;
-    pthread_t tid;
+	struct msg_info *msg;
+	socklen_t sin_size;
+	ssize_t rc;
+	pthread_t tid;
 
-    for(;;) {
-        msg = malloc (sizeof (struct msg_info));
-        sin_size = sizeof (struct sockaddr_in);
-        if ((rc = recvfrom (sock, msg->msg, MSG_MAX-1, 0,
-                    (struct sockaddr*) &msg->addr, &sin_size)) == -1) {
-            perror ("recvfrom");
-            continue;
-        }
-        msg->msg[rc] = '\0';
-        msg->len = rc;
+	for(;;) {
+		msg = malloc(sizeof(struct msg_info));
+		sin_size = sizeof(struct sockaddr_in);
 
-        pthread_mutex_lock (&num_threads_lock);
-        if (num_threads >= max_threads) {
-            fprintf (stderr, "thread limit reached: discarding message\n");
-            pthread_mutex_unlock (&num_threads_lock);
-            free (msg);
-            continue;
-        }
+		rc = recvfrom(sock, msg->msg, MSG_MAX-1, 0,
+				(struct sockaddr*) &msg->addr, &sin_size);
+		if (rc == -1) {
+			perror("recvfrom");
+			continue;
+		}
+		msg->msg[rc] = '\0';
+		msg->len = rc;
 
-        num_threads++;
-        pthread_mutex_unlock (&num_threads_lock);
+		pthread_mutex_lock(&num_threads_lock);
+		if (num_threads >= max_threads) {
+			fprintf(stderr, "thread limit reached: discarding message\n");
+			pthread_mutex_unlock(&num_threads_lock);
+			free(msg);
+			continue;
+		}
+
+		num_threads++;
+		pthread_mutex_unlock(&num_threads_lock);
 
 #ifdef PSNETLOG
-        inet_ntop (msg->addr.ss_family,
-                get_in_addr ((struct sockaddr*) &msg->addr),
-                msg->paddr, sizeof msg->paddr);
-        printf ("M %s\n", msg->paddr);
+		inet_ntop(msg->addr.ss_family,
+				get_in_addr((struct sockaddr*) &msg->addr),
+				msg->paddr, sizeof msg->paddr);
+		printf("M %s\n", msg->paddr);
 #endif
 
-        if (pthread_create (&tid, NULL, cb, msg))
-            perror ("pthread_create");
-        else
-            pthread_detach (tid);
-    }
-    close (sock);
+		if (pthread_create(&tid, NULL, cb, msg))
+			perror("pthread_create");
+		else
+			pthread_detach(tid);
+	}
+	close(sock);
 }
