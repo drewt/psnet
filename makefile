@@ -60,9 +60,6 @@ $(router): $(common)
 $(common):
 	$(do_submake)
 
-README: $(docdir)/psnet_protcol
-	$(call cmd,groff)
-
 install: all
 	$(call cmd_install, $(tracker)/pstrackd, $(bindir)/pstrackd)
 	$(call cmd_install, $(docdir)/psnet_protocol, $(man7dir)/psnet_protocol$(man7ext), -m 0644)
